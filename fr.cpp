@@ -12,7 +12,7 @@ int gcd_(int a, int b){ int t; while(b != 0){ t = b; b = a%b; a = t; } return ab
 
 //std::function<int(int, int)> mygcd = gcd;
 //std::bfloat16_t
-
+// rational numbers - proper fraction
 struct fraction
 {
     float n; float d;
@@ -27,7 +27,8 @@ struct fraction
     //fraction trim(){ int gcd_ = std::gcd((int)n, (int)d); return fraction(n/gcd_, d/gcd_);};
     fraction trim(){ int gcd__ = gcd_((int)n, (int)d); return fraction(n/gcd__, d/gcd__);};
 };
-
+// rational numbers - mixed numbers
+// irretional numbers - therotically irretional numbers can NOT be represented as a fraction of two integers. BUT, we will!
 int main(){
     fraction a(22, 7), b(3, 4), c(1,4);
     fraction x = a+b;
