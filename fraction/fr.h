@@ -152,4 +152,7 @@ struct mixed
 
 mixed cast_mixed(fraction fr){ return mixed(fr.n/fr.d, fraction(abs(fr.n%fr.d), abs(fr.d))); }
 
+double cast_double(fraction fr){return (double)(fr.n/fr.d); }
+double cast_float(fraction fr){return (float)(fr.n/fr.d); }
+
 #endif
