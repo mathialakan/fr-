@@ -4,8 +4,11 @@
 #include <cstdlib>
 #include <chrono>
 #include "../fraction/fr.h"
+#include <unordered_map>
 
-
+#if defined(X86)
+#include <immintrin.h>
+#endif
 #if defined(OMP)
 #include <omp>
 #elif defined(OMP_OL)
@@ -80,6 +83,78 @@ et* mat_mul(et* A, et* B, int N, int K, int M){
             C[M*i +j]= 0;
             for(int k=0; k<K; k++)
                 C[M*i +j] += A[K*i + k] *B[M*k +j]; 
+        }
+    return C;
+}
+
+template<typename et>
+et* mat_mul_i0(et* A, et* B, int N, int K, int M){
+
+    et* C = (et*)malloc(N*M *sizeof(et));
+    C = {0};
+    #if defined(OMP_OL)
+        #pragma omp target enter data map(alloc: C[:n*m])
+    #elif defined(OACC)
+        #pragma acc enter data create(C[:n*m])
+    #endif
+
+    #if defined(OMP)
+        #pragma omp parallel for collapse(2) schedule(dynamic)
+    #elif defined(OMP_OL)
+        #pragma omp target teams distributed parallel for collapse(3) \
+            thread_limit(team_size) num_teams((N*M +1)/team_size) 
+    #elif defined(OACC)
+        #pragma acc parallel loop present(A, B, C) gang worker \
+                num_workers(team_size) vector_length(32)
+    #endif
+    for(int i=0; i<N; i++)
+        for(int j=0; j<M; j++){
+            //C[M*i +j]= 0;
+            #if defined(OMP)
+            #pragma omp simd
+            #elif defined(OMP_OL)
+            #pragma omp simd
+            #elif defined(OACC)
+            #pragma acc loop vector
+            #endif
+            for(int k=0; k<K; k++)
+                C[M*i +j] += A[K*i + k] *B[M*k +j]; 
+        }
+    return C;
+}
+
+
+template<typename et>
+et* mat_mul_avx(et* A, et* B, int N, int K, int M, int simd_len){  //simd_len = 8
+
+    et* C = (et*)malloc(N*M *sizeof(et));
+    C = {0};
+    #if defined(OMP_OL)
+        #pragma omp target enter data map(alloc: C[:n*m])
+    #elif defined(OACC)
+        #pragma acc enter data create(C[:n*m])
+    #endif
+
+    #if defined(OMP)
+        #pragma omp parallel for collapse(2) schedule(dynamic)
+    #elif defined(OMP_OL)
+        #pragma omp target teams distributed parallel for collapse(3) \
+            thread_limit(team_size) num_teams((N*M +1)/team_size) 
+    #elif defined(OACC)
+        #pragma acc parallel loop present(A, B, C) gang worker \
+                num_workers(team_size) vector_length(32)
+    #endif
+    for(int i=0; i<N; i++)
+        for(int j=0; j<M; j++){
+            for(int k=0; k<K; k+=simd_len) 
+            //Vectorizing using AVX intrinsics
+            #if defined(X86)
+                __m256 av = _mm256_loadu_ps(A+ (K*i + k)); 
+                __m256 bv = _mm256_loadu_ps(B+ (M*k +j));
+                __m256 cv = _mm256_add_ps(av,bv);
+                _mm256_storeu_ps(C +(M*i +j), cv); 
+            #endif
+            C[M*i +j] += A[K*i + k] *B[M*k +j]; 
         }
     return C;
 }
@@ -347,13 +422,15 @@ template<typename et>
 unordered_map<string, double> test_mm_fr(int n, int k, int m){
 
     unordered_map<string, double> time_local;
+    //et* A; 
+    //et* B;
 
     et* A = (et*)malloc( n*k* sizeof(et));
     et* B = (et*)malloc( k*m* sizeof(et));
     auto start_time = chrono::steady_clock::now();
-
     fill_mat_fr(A, n, k);
     fill_mat_fr(B, k, m); 
+
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
@@ -450,8 +527,8 @@ void efficiency_analysis(unordered_map<string, double> time_map , size_t dsize, 
 
 int main(){
     
-    int n = 100, m = 100, k=100;
-    //int n = 2, m = 2, k=2;
+    //int n = 100, m = 100, k=100;
+    int n = 2, m = 2, k=2;
     // 2D-Vector of floats
     /*
     vector<vector<float> > A(n, vector<float>(k));
@@ -466,7 +543,7 @@ int main(){
     cout << "Result" << endl;
     print_mat((vector<vector<float> >)C);
     */
-
+//*
     unordered_map<string, double> time_map;
     auto start_time = chrono::steady_clock::now();
     auto time_int = test_mm<int>(n, k, m); cout<< "Finished MMM using 1-D array of integers" << endl; //Test 1-D array
@@ -497,7 +574,9 @@ int main(){
     efficiency_analysis(time_fr, dsize, sizeof(fraction));
     cout<< endl << "1D-mixed Time " << endl;
     efficiency_analysis(time_mfr, dsize, sizeof(mixed));
-
+//*/
+//auto time_fr = test_mm_fr<fraction>(n, k, m); cout<< "Finished MMM using 1-D array of fractions" << endl; //Test Fraction
+//auto time_fr = test_mm_fr<mixed>(n, k, m); cout<< "Finished MMM using 1-D array of mixed" << endl; //Test mixed
     
     return 0;
 }
