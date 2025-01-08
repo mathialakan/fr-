@@ -520,15 +520,29 @@ void efficiency_analysis(unordered_map<string, double> time_map , size_t dsize, 
     for(auto& pair : time_map){
         auto seconds = pair.second * 1.e-6;
         auto gigabytes = (double)(dsize*tsize)* 1.e-9; // GB
-        cout<< pair.first << "\t" << (gigabytes/seconds) << endl;
+        auto bwidth = (double)(dsize*tsize/pair.second)* 1.e-3; // GB
+        cout<< pair.first << "\t" << (gigabytes/seconds) << "\t" << bwidth << endl;
     }       
     cout<< "----------------------------------" << endl;
 }
 
-int main(){
-    
-    //int n = 100, m = 100, k=100;
-    int n = 2, m = 2, k=2;
+int main( int argc, char* argv[]){
+   
+    int n, m, k;
+    switch (argc){    
+	    case 1: 	    
+    		 n = 100; m = 100; k=100; break;
+	    case 2:
+		 n = atoi(argv[1]); k = n; m = n; break;
+	    case 3:
+		 n = atoi(argv[1]); k = atoi(argv[2]); m = n; break;
+	    case 4: 
+		 n = atoi(argv[1]); k = atoi(argv[2]); m = atoi(argv[3]); break;
+	    case 5:
+		if(atoi(argv[2]) != atoi(argv[3])) cout<< "Number of columns of the first matrix should be equal to the number of rows of the second matrix" << endl;
+	       return 0;
+	    default: break;
+    }		     
     // 2D-Vector of floats
     /*
     vector<vector<float> > A(n, vector<float>(k));
@@ -574,9 +588,6 @@ int main(){
     efficiency_analysis(time_fr, dsize, sizeof(fraction));
     cout<< endl << "1D-mixed Time " << endl;
     efficiency_analysis(time_mfr, dsize, sizeof(mixed));
-//*/
-//auto time_fr = test_mm_fr<fraction>(n, k, m); cout<< "Finished MMM using 1-D array of fractions" << endl; //Test Fraction
-//auto time_fr = test_mm_fr<mixed>(n, k, m); cout<< "Finished MMM using 1-D array of mixed" << endl; //Test mixed
     
     return 0;
 }
