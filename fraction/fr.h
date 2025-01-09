@@ -8,7 +8,7 @@ int gcd_(int a, int b){ int t; while(b != 0){ t = b; b = a%b; a = t; } return ab
 //User defined assert function
 void assert_fr(bool expr, std::string msg){ if (!expr) std::cerr<< msg;}
 
-/*Proper and improper fractions*/
+/*Proper and improper fractions  - 8 bytes (Current representation uses int as a base type (2 ints = 8 bytes) --- we need to consider proper base data-type to reduce the size)*/
 struct fraction
 {
     int n; int d;
@@ -24,15 +24,20 @@ struct fraction
 
     //Assign whole to fraction variable - Casting from whole to fraction
     inline fraction& operator = (const int &whole){ n=whole; d=1; return *this;}
+    //inline fraction& operator = ( fraction &fr){ this->n =fr.n; this->d = fr.d; this->trim(); return *this;}
 
     //ALU operations between two fractions 
-    inline fraction operator + (const fraction &fr) const {return (fr.d== d) ? fraction(n+fr.n, d).trim() : fraction(fr.d*n +d*fr.n, d*fr.d).trim();}
-    inline fraction operator - (const fraction &fr) const {return (fr.d== d) ? fraction(n-fr.n, d).trim() : fraction(fr.d*n -d*fr.n, d*fr.d).trim();}
-    inline fraction operator * (const fraction &fr) const {return fraction(n*fr.n, d*fr.d).trim();}
-    inline fraction operator / (const fraction &fr) const {return fraction(n*fr.d, d*fr.n).trim();}
+    //inline fraction operator + (const fraction &fr) const {return (fr.d== d) ? fraction(n+fr.n, d).trim() : fraction(fr.d*n +d*fr.n, d*fr.d).trim();} // 4 ops
+    //inline fraction operator - (const fraction &fr) const {return (fr.d== d) ? fraction(n-fr.n, d).trim() : fraction(fr.d*n -d*fr.n, d*fr.d).trim();} // 4 ops
+    inline fraction operator + (const fraction &fr) const {return fraction(fr.d*n +d*fr.n, d*fr.d).trim();} // 7 ops = 4 ops + atleast 3 ops (relational, modulus, and absolute) by trim
+    inline fraction operator - (const fraction &fr) const {return fraction(fr.d*n -d*fr.n, d*fr.d).trim();} // 7 ops = 4 ops + atleast 3 ops by trim
+    inline fraction operator * (const fraction &fr) const {return fraction(n*fr.n, d*fr.d).trim();}  // 5 ops = 2 ops + atleast 3 ops by trim
+    inline fraction operator / (const fraction &fr) const {return fraction(n*fr.d, d*fr.n).trim();}  // 5 ops = 2 ops + atleast 3 ops by trim
 
-    inline void operator += (const fraction &fr) { if(fr.d== d)  n=n+fr.n; else {n = fr.d*n +d*fr.n; d = d*fr.d;} this_trim();} //void operator += (const fraction &fr) {fraction temp(n,d); temp = (temp +fr).trim(); n = temp.n; d = temp.d; } 
-    inline void operator -= (const fraction &fr) { if(fr.d== d)  n=n-fr.n; else {n = fr.d*n -d*fr.n; d = d*fr.d;} this_trim();} //void operator -= (const fraction &fr) {fraction temp(n,d); temp = (temp -fr).trim(); n = temp.n; d = temp.d; } 
+    //inline void operator += (const fraction &fr) { if(fr.d== d)  n=n+fr.n; else {n = fr.d*n +d*fr.n; d = d*fr.d;} this_trim();} //void operator += (const fraction &fr) {fraction temp(n,d); temp = (temp +fr).trim(); n = temp.n; d = temp.d; } 
+    //inline void operator -= (const fraction &fr) { if(fr.d== d)  n=n-fr.n; else {n = fr.d*n -d*fr.n; d = d*fr.d;} this_trim();} //void operator -= (const fraction &fr) {fraction temp(n,d); temp = (temp -fr).trim(); n = temp.n; d = temp.d; } 
+    inline void operator += (const fraction &fr) { n = fr.d*n +d*fr.n; d = d*fr.d; this_trim();} //void operator += (const fraction &fr) {fraction temp(n,d); temp = (temp +fr).trim(); n = temp.n; d = temp.d; } 
+    inline void operator -= (const fraction &fr) { n = fr.d*n -d*fr.n; d = d*fr.d; this_trim();} //void operator -= (const fraction &fr) {fraction temp(n,d); temp = (temp -fr).trim(); n = temp.n; d = temp.d; } 
     inline void operator *= (const fraction &fr) { n = n*fr.n; d = d*fr.d; this_trim();} //void operator *= (const fraction &fr) {fraction temp(n,d); temp = (temp *fr).trim(); n = temp.n; d = temp.d; } 
     inline void operator /= (const fraction &fr) { n = n*fr.d; d = d*fr.n; this_trim();} //void operator /= (const fraction &fr) {fraction temp(n,d); temp = (temp /fr).trim(); n = temp.n; d = temp.d; } 
 
@@ -49,11 +54,11 @@ struct fraction
     inline bool operator <= (const fraction &fr) const {return (n*fr.d <= fr.n*d) ;}
     
     //ALU operations between a fraction and a whole number 
-    inline fraction operator + (const int &whole) const {return fraction(n+ whole*d, d).trim();}
+    inline fraction operator + (const int &whole) const {return fraction(n+ whole*d, d).trim();} // 5 ops = 2 ops + 3 ops 
     //int operator + (const fraction &whole) const {return fraction(whole*d +n, d);}  ??? - propose to include fraction to primary data type definitiations 
-    inline fraction operator - (const int &whole) const {return fraction(n- whole*d, d).trim();}
-    inline fraction operator * (const int &whole) const {return fraction(whole*n, d).trim();}
-    inline fraction operator / (const int &whole) const {return fraction(n, whole*d).trim();}
+    inline fraction operator - (const int &whole) const {return fraction(n- whole*d, d).trim();} // 5 ops =2 ops + 3 ops 
+    inline fraction operator * (const int &whole) const {return fraction(whole*n, d).trim();} // 4 ops = 1 ops + 3 ops 
+    inline fraction operator / (const int &whole) const {return fraction(n, whole*d).trim();} // 4 ops = 1 ops + 3 ops 
 
     inline void operator += (const int &whole) { n = n+ whole*d; this_trim();} //void operator += (const int &whole) {fraction temp(n,d); temp = (temp +whole).trim(); n = temp.n; d = temp.d; } 
     inline void operator -= (const int &whole) { n = n- whole*d; this_trim();} //void operator -= (const int &whole) {fraction temp(n,d); temp = (temp -whole).trim(); n = temp.n; d = temp.d; } 
@@ -70,7 +75,7 @@ struct fraction
 };
 
 
-/* Mixed numbers*/
+/* Mixed numbers  - 12 bytes (Current representation uses int as a base type (3 ints = 12 bytes) --- we need to consider proper base data-type to reduce the size)*/ 
 struct mixed
 {
     int w; fraction fr;
@@ -82,17 +87,17 @@ struct mixed
     fraction cast_fraction(){return (fr+w).trim();}; //fraction cast_fraction(){return fraction(w*fr.d +fr.n, fr.d);};
 
     //Assign fraction to mixed variable - Casting from fraction to mixed (lower-cast)
-    inline mixed& operator = (const fraction &fr_){ w = fr_.n/fr_.d; fr.n= abs(fr_.n%fr_.d); fr.d = fr_.d; return *this;}
+    inline mixed& operator = (const fraction &fr_){ w = fr_.n/fr_.d; fr.n= abs(fr_.n%fr_.d); fr.d = fr_.d; return *this;} // 3
     //Assign whole to mixed variable - Casting from whole to mixed
     inline mixed& operator = (const int &whole){ w=whole; fr.n=0; fr.d=1; return *this;}
 
     friend std::ostream& operator <<(std::ostream& outs, const mixed& mfr){return outs << mfr.w << "(" << mfr.fr.n << "/" << mfr.fr.d << ")";};
 
     // ALU operation between 2 mixed numbers
-    inline mixed operator + (const mixed &mfr) const { mixed temp; temp =(fr +mfr.fr + w +mfr.w).trim(); return temp;}
-    inline mixed operator - (const mixed &mfr) const { mixed temp; temp =(fr -mfr.fr + w -mfr.w).trim(); return temp;}
-    inline mixed operator * (const mixed &mfr) const { mixed temp; temp =(fr*mfr.fr + fr*mfr.w + mfr.fr*w +mfr.w*w ).trim(); return temp;}
-    inline mixed operator / ( mixed &mfr) const { mixed temp; temp =((fr +w) / mfr.cast_fraction()).trim(); return temp; }
+    inline mixed operator + (const mixed &mfr) const { mixed temp; temp =(fr +mfr.fr + w +mfr.w).trim(); return temp;}  // 23 ops = 7 + 5 + 5 +3(a) +3(trim)
+    inline mixed operator - (const mixed &mfr) const { mixed temp; temp =(fr -mfr.fr + w -mfr.w).trim(); return temp;}  // 23 ops = 7 + 5 + 5 +3(a) +3(trim)
+    inline mixed operator * (const mixed &mfr) const { mixed temp; temp =(fr*mfr.fr + fr*mfr.w + mfr.fr*w +mfr.w*w ).trim(); return temp;}  // 20 ops = (5 + 4 + 4 + 1) +3(a) +3(trim)
+    inline mixed operator / ( mixed &mfr) const { mixed temp; temp =((fr +w) / mfr.cast_fraction()).trim(); return temp; }  // 24 ops  = 5 + 5 + (5 +3)  +3(a) +3(trim)
 
     inline void operator += (const mixed &mfr) { mixed temp; temp = (fr +mfr.fr+ w +mfr.w).trim(); w = temp.w; fr = temp.fr;} //void operator += (const mixed &mfr) { w = w +mfr.w; fr = fr +mfr.fr;}
     inline void operator -= (const mixed &mfr) { mixed temp; temp = (fr -mfr.fr+ w -mfr.w).trim(); w = temp.w; fr = temp.fr;} //void operator -= (const mixed &mfr) { w = w -mfr.w; fr = fr -mfr.fr;}
@@ -112,10 +117,10 @@ struct mixed
     inline bool operator <= ( mixed &mfr) const {return ((fr+w) <= mfr.cast_fraction()); }
 
     // ALU operation between a mixed and a fraction number
-    inline mixed operator + (const fraction &fr_) const {mixed temp; temp = (fr+fr_+w).trim(); return temp;}
-    inline mixed operator - (const fraction &fr_) const {mixed temp; temp = (fr-fr_+w).trim(); return temp;}
-    inline mixed operator * (const fraction &fr_) const {mixed temp; temp = ((fr_*w) + (fr*fr_)).trim(); return temp;}
-    inline mixed operator / (const fraction &fr_) const {mixed temp; temp = ((fr+w)/fr_).trim(); return temp;}
+    inline mixed operator + (const fraction &fr_) const {mixed temp; temp = (fr+fr_+w).trim(); return temp;}  // 18 ops = 7 +5 +3(a) +3(trim)
+    inline mixed operator - (const fraction &fr_) const {mixed temp; temp = (fr-fr_+w).trim(); return temp;}  // 18 ops = 7 +5 +3(a) +3(trim)
+    inline mixed operator * (const fraction &fr_) const {mixed temp; temp = ((fr_*w) + (fr*fr_)).trim(); return temp;} // 15 ops = 4 +5 +3(a) +3(trim)
+    inline mixed operator / (const fraction &fr_) const {mixed temp; temp = ((fr+w)/fr_).trim(); return temp;} // 16 ops = 5 + 5 +3(a) +3(trim)
 
     inline void operator += (const fraction &fr_) { mixed temp; temp =(fr+fr_+w).trim(); w = temp.w; fr = temp.fr;}
     inline void operator -= (const fraction &fr_) { mixed temp; temp =(fr-fr_+w).trim(); w = temp.w; fr = temp.fr;}
@@ -130,10 +135,10 @@ struct mixed
     inline bool operator <= ( const fraction &fr_) const {return ((fr+w) <= fr_); }
 
     // ALU operation between a mixed and a whole number
-    inline mixed operator + (const int &whole) const {mixed temp; temp =(fr+w +whole).trim(); return temp;} //mixed operator + (const int &whole) const {return mixed(w+whole, fr);}
-    inline mixed operator - (const int &whole) const {mixed temp; temp =(fr+w -whole).trim(); return temp;}
-    inline mixed operator * (const int &whole) const {mixed temp; temp =((fr+w)*whole).trim(); return temp;} //mixed operator * (const int &whole) const {return mixed(w*whole, fr*whole);}
-    inline mixed operator / (const int &whole) const {mixed temp; temp =((fr+w)/whole).trim(); return temp;} //mixed operator / (const int &whole) const {return cast_mixed((fraction(w,whole) +fr/whole).trim());}
+    inline mixed operator + (const int &whole) const {mixed temp; temp =(fr+w +whole).trim(); return temp;}  // 16 ops = 5 +5 +3  +3 //mixed operator + (const int &whole) const {return mixed(w+whole, fr);}
+    inline mixed operator - (const int &whole) const {mixed temp; temp =(fr+w -whole).trim(); return temp;}  // 16 ops = 5 +5 +3  +3
+    inline mixed operator * (const int &whole) const {mixed temp; temp =((fr+w)*whole).trim(); return temp;} // 15 ops = 5 +4 +3  +3 //mixed operator * (const int &whole) const {return mixed(w*whole, fr*whole);}
+    inline mixed operator / (const int &whole) const {mixed temp; temp =((fr+w)/whole).trim(); return temp;} // 15 ops = 5 +4 +3  +3 //mixed operator / (const int &whole) const {return cast_mixed((fraction(w,whole) +fr/whole).trim());}
 
     inline void operator += (const int &whole) { mixed temp; temp =(fr+w +whole).trim(); w = temp.w; fr = temp.fr;} 
     inline void operator -= (const int &whole) { mixed temp; temp =(fr+w -whole).trim(); w = temp.w; fr = temp.fr;}
