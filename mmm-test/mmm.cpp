@@ -24,43 +24,43 @@ using namespace std;
 
 /* Using c-style pointer 1D arrays*/
 template<typename et>
-bool fill_mat(et* A, int N, int M){
+bool fill_mat(et* A, int M, int N){
     srand(time(0));
 
-    for(int i=0; i <N; ++i)
-    for(int j=0; j <M; ++j)
-        A[M*i +j] = 1 + (rand()% EMAX);
+    for(int i=0; i <M; ++i)
+    for(int j=0; j <N; ++j)
+        A[N*i +j] = 1 + (rand()% EMAX);
 
     return true;
 }
 
 //template<typename et>
-bool fill_mat_fr(fraction* A, int N, int M){
+bool fill_mat_fr(fraction* A, int M, int N){
     srand(time(0));
 
-    for(int i=0; i <N; ++i){
-    for(int j=0; j <M; ++j){
+    for(int i=0; i <M; ++i){
+    for(int j=0; j <N; ++j){
         fraction e(1 + (rand()% NMAX), 1 + (rand()% DMAX));
-        A[M*i +j] = e;
+        A[N*i +j] = e;
     }
     }
     return true;
 }
 
-bool fill_mat_mfr(mixed* A, int N, int M){
+bool fill_mat_mfr(mixed* A, int M, int N){
     srand(time(0));
 
-    for(int i=0; i <N; ++i){
-    for(int j=0; j <M; ++j){
+    for(int i=0; i <M; ++i){
+    for(int j=0; j <N; ++j){
         mixed e( 1 + (rand()% WMAX), fraction(1 + (rand()% NMAX), 1 + (rand()% DMAX)));
-        A[M*i +j] = e;
+        A[N*i +j] = e;
     }
     }
     return true;
 }
 
 template<typename et>
-et* mat_mul(et* A, et* B, int N, int K, int M){
+et* mat_mul(et* A, et* B, int M, int K, int N){
 
     et* C = (et*)malloc(N*M *sizeof(et));
     #if defined(OMP_OL)
@@ -78,17 +78,17 @@ et* mat_mul(et* A, et* B, int N, int K, int M){
         #pragma acc parallel loop present(A, B, C) gang worker \
                 num_workers(team_size) vector_length(32)
     #endif
-    for(int i=0; i<N; i++)
-        for(int j=0; j<M; j++){
-            C[M*i +j]= 0;
+    for(int i=0; i<M; i++)
+        for(int j=0; j<N; j++){
+            C[N*i +j]= 0;
             for(int k=0; k<K; k++)
-                C[M*i +j] += A[K*i + k] *B[M*k +j]; 
+                C[N*i +j] += A[K*i + k] *B[N*k +j];  // 2 ops for prime type, 12 ops (7+5) for fraction, 47 ops (23 +24) for mixed numbers
         }
     return C;
 }
 
 template<typename et>
-et* mat_mul_i0(et* A, et* B, int N, int K, int M){
+et* mat_mul_i0(et* A, et* B, int M, int K, int N){
 
     et* C = (et*)malloc(N*M *sizeof(et));
     C = {0};
@@ -107,8 +107,8 @@ et* mat_mul_i0(et* A, et* B, int N, int K, int M){
         #pragma acc parallel loop present(A, B, C) gang worker \
                 num_workers(team_size) vector_length(32)
     #endif
-    for(int i=0; i<N; i++)
-        for(int j=0; j<M; j++){
+    for(int i=0; i<M; i++)
+        for(int j=0; j<N; j++){
             //C[M*i +j]= 0;
             #if defined(OMP)
             #pragma omp simd
@@ -118,14 +118,14 @@ et* mat_mul_i0(et* A, et* B, int N, int K, int M){
             #pragma acc loop vector
             #endif
             for(int k=0; k<K; k++)
-                C[M*i +j] += A[K*i + k] *B[M*k +j]; 
+                C[N*i +j] += A[K*i + k] *B[N*k +j]; 
         }
     return C;
 }
 
 
 template<typename et>
-et* mat_mul_avx(et* A, et* B, int N, int K, int M, int simd_len){  //simd_len = 8
+et* mat_mul_avx(et* A, et* B, int M, int K, int N, int simd_len){  //simd_len = 8
 
     et* C = (et*)malloc(N*M *sizeof(et));
     C = {0};
@@ -144,8 +144,8 @@ et* mat_mul_avx(et* A, et* B, int N, int K, int M, int simd_len){  //simd_len = 
         #pragma acc parallel loop present(A, B, C) gang worker \
                 num_workers(team_size) vector_length(32)
     #endif
-    for(int i=0; i<N; i++)
-        for(int j=0; j<M; j++){
+    for(int i=0; i<M; i++)
+        for(int j=0; j<N; j++){
             for(int k=0; k<K; k+=simd_len) 
             //Vectorizing using AVX intrinsics
             #if defined(X86)
@@ -154,16 +154,16 @@ et* mat_mul_avx(et* A, et* B, int N, int K, int M, int simd_len){  //simd_len = 
                 __m256 cv = _mm256_add_ps(av,bv);
                 _mm256_storeu_ps(C +(M*i +j), cv); 
             #endif
-            C[M*i +j] += A[K*i + k] *B[M*k +j]; 
+            C[N*i +j] += A[K*i + k] *B[N*k +j]; 
         }
     return C;
 }
 
 template<typename et>
-bool print_mat(et* A, int N, int M){
-    for(int i=0; i<N; i++){
-        for(int j=0; j<M; j++)
-            cout<< "\t" <<A[M*i+j];
+bool print_mat(et* A, int M, int N){
+    for(int i=0; i<M; i++){
+        for(int j=0; j<N; j++)
+            cout<< "\t" <<A[N*i+j];
         cout <<endl;
     }
     return true;
@@ -174,11 +174,11 @@ bool print_mat(et* A, int N, int M){
 template<typename et>
 bool fill_mat(et** A){
 
-    int N = sizeof(A)/sizeof(A[0]);
-    int M = sizeof(A[0])/sizeof(A[0][0]);
+    int M = sizeof(A)/sizeof(A[0]);
+    int N = sizeof(A[0])/sizeof(A[0][0]);
 
-    for(int i=0; i <N; ++i)
-    for(int j=0; j <M; ++j)
+    for(int i=0; i <M; ++i)
+    for(int j=0; j <N; ++j)
         A[i][j] = 1+ (rand()%EMAX);
     
     return true;
@@ -187,13 +187,13 @@ template<typename et>
 et** mat_maul(et** A, et** B){
 
     //int size_bytes = sizeof(A);
-    int N = sizeof(A)/sizeof(A[0]);
+    int M = sizeof(A)/sizeof(A[0]);
     int K = sizeof(A[0])/sizeof(A[0][0]);
-    int M = sizeof(B)/sizeof(B[0])/sizeof(B[0][0]);
+    int N = sizeof(B)/sizeof(B[0])/sizeof(B[0][0]);
 
-    et** C = (et**) malloc(N*sizeof(et*));
-    for(int i=0; i<N; i++)
-        C[i] = (et*)malloc(M*sizeof(et));
+    et** C = (et**) malloc(M*sizeof(et*));
+    for(int i=0; i<M; i++)
+        C[i] = (et*)malloc(N*sizeof(et));
 
     #if defined(OMP_OL)
         #pragma omp target enter data map(alloc: C[:n])
@@ -209,8 +209,8 @@ et** mat_maul(et** A, et** B){
     #elif defined(OACC)
         #pragma acc parallel loop
     #endif
-    for(int i=0; i<N; i++)
-        for(int j=0; j<M; j++){
+    for(int i=0; i<M; i++)
+        for(int j=0; j<N; j++){
             C[i][j] = 0;
             for(int k=0; k<K; k++)
                 C[i][j] += A[i][k]*B[k][j];
@@ -221,7 +221,7 @@ et** mat_maul(et** A, et** B){
 
 /* Using cpp-style 1D pointer arrays */
 template<typename et>
-et* mat_mul_cpp(et* A, et* B, int N, int K, int M){
+et* mat_mul_cpp(et* A, et* B, int M, int K, int N){
 
     et* C = new et[N*M];
     
@@ -239,11 +239,11 @@ et* mat_mul_cpp(et* A, et* B, int N, int K, int M){
     #elif defined(OACC)
         #pragma acc parallel loop
     #endif
-    for(int i=0; i<N; i++)
-    for(int j=0; j<M; j++){
-        C[M*(i-1) +j] = 0;
+    for(int i=0; i<M; i++)
+    for(int j=0; j<N; j++){
+        C[M*i +j] = 0;
         for(int k=0; k<K; k++)
-            C[M*(i-1) +j] += A[K*(i-1)+k]*B[M*(k-1)+j];
+            C[N*i +j] += A[K*i+k]*B[N*k+j];
     }
     return C;
 
@@ -253,13 +253,13 @@ et* mat_mul_cpp(et* A, et* B, int N, int K, int M){
 template<typename et>
 et** mat_maul_cpp(et** A, et** B){
 
-    int N = sizeof(A)/sizeof(A[0]);
+    int M = sizeof(A)/sizeof(A[0]);
     int K = sizeof(A[0])/sizeof(A[0][0]);
-    int M = sizeof(B)/sizeof(B[0])/sizeof(B[0][0]);
+    int N = sizeof(B)/sizeof(B[0])/sizeof(B[0][0]);
 
-    et** C =  new et*[N];
-    for (int i=0; i<N; i++)
-        C[i] = new et[M];
+    et** C =  new et*[M];
+    for (int i=0; i<M; i++)
+        C[i] = new et[N];
 
     #if defined(OMP_OL)
         #pragma omp target enter data map(alloc: C[:n])
@@ -275,8 +275,8 @@ et** mat_maul_cpp(et** A, et** B){
     #elif defined(OACC)
         #pragma acc parallel loop
     #endif
-    for (int i=0; i<N; i++)
-        for( int j=0; j<M; j++){
+    for (int i=0; i<M; i++)
+        for( int j=0; j<N; j++){
             C[i][j]=0;
             for(int k=0; k<K; k++)
                 C[i][j] += A[i][k] * B[k][j]; 
@@ -298,11 +298,11 @@ template<typename et>
 vector<vector<et> > mat_mul(vector<vector<et> > A, vector<vector<et> > B){
 
     //if (A.size()==0 || B.size()==0) return 0;
-    int N = A.size();
+    int M = A.size();
     int K = A[0].size();
-    int M = B[0].size();
+    int N = B[0].size();
     //if (K != B.size()) return 0;
-    vector<vector<et> > C(N, vector<et>(M));
+    vector<vector<et> > C(M, vector<et>(N));
 
     #if defined(OMP)
         #pragma omp parallel for collapse(2) schedule(dynamic)
@@ -312,8 +312,8 @@ vector<vector<et> > mat_mul(vector<vector<et> > A, vector<vector<et> > B){
     #elif defined(OACC)
         #pragma acc parallel loop
     #endif  
-    for(int i=0; i< N; ++i)
-        for(int j=0; j< M; ++j){
+    for(int i=0; i< M; ++i)
+        for(int j=0; j< N; ++j){
            C[i][j] = 0;
            for(int k=0; k< K; ++k)
                C[i][j] += A[i][k] * B[k][j]; 
@@ -367,33 +367,33 @@ int print_mat(vector<vector<et> > A){
 }
 
 template<typename et>
-unordered_map<string, double> test_mm(int n, int k, int m){
+unordered_map<string, double> test_mm(int m, int k, int n){
 
     unordered_map<string, double> time_local;
 
-    et* A = (et*)malloc( n*k* sizeof(et));
-    et* B = (et*)malloc( k*m* sizeof(et));
+    et* A = (et*)malloc( m*k* sizeof(et));
+    et* B = (et*)malloc( k*n* sizeof(et));
     auto start_time = chrono::steady_clock::now();
 
-    fill_mat(A, n, k);
-    fill_mat(B, k, m);
+    fill_mat(A, m, k);
+    fill_mat(B, k, n);
     #if defined(OMP_OL)
-        #prgama omp target enter data map(to:A[0:n*k],B[0:k*m])
+        #prgama omp target enter data map(to:A[0:m*k],B[0:k*n])
     #elif defined(OACC)
-        #pragma acc enter data copyin(A[:n*k],B[:k*m])
+        #pragma acc enter data copyin(A[:m*k],B[:k*n])
     #endif
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    print_mat<et>(A, n, k);
+    print_mat<et>(A, m, k);
     cout<<endl;
-    print_mat<et>(B, k, m);
+    print_mat<et>(B, k, n);
     end_time = chrono::steady_clock::now();
     time_local["print_pre-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    auto C = mat_mul<et>(A, B, n, k, m);
+    auto C = mat_mul<et>(A, B, m, k, n);
     end_time = chrono::steady_clock::now();
     time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
@@ -404,51 +404,51 @@ unordered_map<string, double> test_mm(int n, int k, int m){
     #elif defined(OACC)
         #pragma acc update self(C[0:n*m])
     #endif
-    print_mat<et>(C, n, m);
+    print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     //start_time = end_time;
 
     #if defined(OMP_OL)
-        #prgama omp target exit data map(delete:A[0:n*k],B[0:k*m],C[0:m*n])
+        #prgama omp target exit data map(delete:A[0:m*k],B[0:k*n],C[0:m*n])
     #elif defined(OACC)
-        #pragma acc exit data delete(A[:n*k],B[:k*m],C[0:m*n])
+        #pragma acc exit data delete(A[:m*k],B[:k*n],C[0:m*n])
     #endif
 
     return time_local;
 }
 
 template<typename et>
-unordered_map<string, double> test_mm_fr(int n, int k, int m){
+unordered_map<string, double> test_mm_fr(int m, int k, int n){
 
     unordered_map<string, double> time_local;
     //et* A; 
     //et* B;
 
-    et* A = (et*)malloc( n*k* sizeof(et));
-    et* B = (et*)malloc( k*m* sizeof(et));
+    et* A = (et*)malloc( m*k* sizeof(et));
+    et* B = (et*)malloc( k*n* sizeof(et));
     auto start_time = chrono::steady_clock::now();
-    fill_mat_fr(A, n, k);
-    fill_mat_fr(B, k, m); 
+    fill_mat_fr(A, m, k);
+    fill_mat_fr(B, k, n); 
 
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    print_mat<et>(A, n, k);
+    print_mat<et>(A, m, k);
     cout<<endl;
-    print_mat<et>(B, k, m);
+    print_mat<et>(B, k, n);
     end_time = chrono::steady_clock::now();
     time_local["print_pre-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    auto C = mat_mul<et>(A, B, n, k, m);
+    auto C = mat_mul<et>(A, B, m, k, n);
     end_time = chrono::steady_clock::now();
     time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
     cout << "Result" << endl;
-    print_mat<et>(C, n, m);
+    print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     //start_time = end_time;
@@ -457,33 +457,33 @@ unordered_map<string, double> test_mm_fr(int n, int k, int m){
 }
 
 template<typename et>
-unordered_map<string, double> test_mm_mfr(int n, int k, int m){
+unordered_map<string, double> test_mm_mfr(int m, int k, int n){
 
     unordered_map<string, double> time_local;
 
-    et* A = (et*)malloc( n*k* sizeof(et));
-    et* B = (et*)malloc( k*m* sizeof(et));
+    et* A = (et*)malloc( m*k* sizeof(et));
+    et* B = (et*)malloc( k*n* sizeof(et));
     auto start_time = chrono::steady_clock::now();
-    fill_mat_mfr(A, n, k);
-    fill_mat_mfr(B, k, m); 
+    fill_mat_mfr(A, m, k);
+    fill_mat_mfr(B, k, n); 
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
     
-    print_mat<et>(A, n, k);
+    print_mat<et>(A, m, k);
     cout<<endl;
-    print_mat<et>(B, k, m);
+    print_mat<et>(B, k, n);
     end_time = chrono::steady_clock::now();
     time_local["print_pre-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    auto C = mat_mul<et>(A, B, n, k, m);
+    auto C = mat_mul<et>(A, B, m, k, n);
     end_time = chrono::steady_clock::now();
     time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
     cout << "Result" << endl;
-    print_mat<et>(C, n, m);
+    print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     //start_time = end_time;
@@ -502,9 +502,9 @@ void efficiency_analysis(unordered_map<string, double> time_map ){
 
 }
 
-void efficiency_analysis(unordered_map<string, double> time_map , size_t dsize, size_t tsize){
+void efficiency_analysis(unordered_map<string, double> time_map , unordered_map<string, int> ndaccesses, size_t tsize, int ops){
 
-    cout<< "Data size (in Bytes) : " <<dsize<<"\t Type size (in Bytes) : " << tsize  << endl;
+    cout<< " Type size (in Bytes) : " << tsize  << endl;
     cout<< "----------------------------------" << endl;
     cout<< "Task" << "\t" << "Time (micro-sec)" << endl;
     cout<< "----------------------------------" << endl;
@@ -513,40 +513,50 @@ void efficiency_analysis(unordered_map<string, double> time_map , size_t dsize, 
     cout<< "----------------------------------" << endl <<endl;
 
     cout<< "----------------------------------" << endl;
-    cout<< "Task" << "\t" << "Bandwidth (GB/s)" << endl;
+    cout<< "Task" << "\t" << "Bandwidth [GB/s]" << "\t" << "Arithmetic Intensity [OPS/Bytes]" << endl;
     cout<< "----------------------------------" << endl;
-    //auto seconds = 0;
-    //auto gigabytes = 0;
+
     for(auto& pair : time_map){
         auto seconds = pair.second * 1.e-6;
-        auto gigabytes = (double)(dsize*tsize)* 1.e-9; // GB
-        auto bwidth = (double)(dsize*tsize/pair.second)* 1.e-3; // GB
-        cout<< pair.first << "\t" << (gigabytes/seconds) << "\t" << bwidth << endl;
+        auto nbytes_accesses = ndaccesses[pair.first]*tsize;
+         // Bandwidth [GB/s] = Data accessed in GB / Consumed time in sec
+        auto bwidth = (seconds>0) ? (double)(nbytes_accesses/seconds)* 1.e-9 : -1; // GB/s
+         // Arithmetic Intensity (ops/bytes - FLOPS/B) = number of FLOPS / number of byte accesses
+        auto ai = (double)(ops/nbytes_accesses);
+        cout<< pair.first << "\t" << bwidth << "\t" << ai << endl;
     }       
     cout<< "----------------------------------" << endl;
+
+    
 }
 
-int main( int argc, char* argv[]){
-   
-    int n, m, k;
-    switch (argc){    
-	    case 1: 	    
-    		 n = 100; m = 100; k=100; break;
-	    case 2:
-		 n = atoi(argv[1]); k = n; m = n; break;
-	    case 3:
-		 n = atoi(argv[1]); k = atoi(argv[2]); m = n; break;
-	    case 4: 
-		 n = atoi(argv[1]); k = atoi(argv[2]); m = atoi(argv[3]); break;
-	    case 5:
-		if(atoi(argv[2]) != atoi(argv[3])) cout<< "Number of columns of the first matrix should be equal to the number of rows of the second matrix" << endl;
-	       return 0;
-	    default: break;
-    }		     
+int main(int argc, char* argv[]){
+    
+    int m, k, n;
+    switch (argc){
+            case 1:
+                 m = 100; n = 100; k=100; break;
+            case 2:
+                 m = atoi(argv[1]); k = m; n = m; break;
+            case 3:
+                 m = atoi(argv[1]); k = atoi(argv[2]); n = m; break;
+            case 4:
+                 m = atoi(argv[1]); k = atoi(argv[2]); n = atoi(argv[3]); break;
+            case 5:
+                if(atoi(argv[2]) != atoi(argv[3])) {
+		       	cout<< "Number of columns of the first matrix should be equal to the number of rows of the second matrix" << endl;
+                  	return 0;
+		}else
+		{
+			m = atoi(argv[1]); k = atoi(argv[2]); n = atoi(argv[4]); break;
+		}	
+            default: break;
+    }           
+
     // 2D-Vector of floats
     /*
-    vector<vector<float> > A(n, vector<float>(k));
-    vector<vector<float> > B(k, vector<float>(m));
+    vector<vector<float> > A(m, vector<float>(k));
+    vector<vector<float> > B(k, vector<float>(n));
 
     //if (read_mat(A) == 1) cout<< "Reading is failed" << endl;
     //if (read_mat(B) == 1) cout<< "Reading is failed" << endl;
@@ -560,34 +570,46 @@ int main( int argc, char* argv[]){
 //*
     unordered_map<string, double> time_map;
     auto start_time = chrono::steady_clock::now();
-    auto time_int = test_mm<int>(n, k, m); cout<< "Finished MMM using 1-D array of integers" << endl; //Test 1-D array
+    auto time_int = test_mm<int>(m, k, n); cout<< "Finished MMM using 1-D array of integers" << endl; //Test 1-D array
     auto end_time = chrono::steady_clock::now();
     time_map["1d-int"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
-    auto time_fl = test_mm<float>(n, k, m); cout<< "Finished MMM using 1-D array of floats" << endl; //Test 1-D array
+    auto time_fl = test_mm<float>(m, k, n); cout<< "Finished MMM using 1-D array of floats" << endl; //Test 1-D array
     end_time = chrono::steady_clock::now();
     time_map["1d-float"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
-    auto time_fr = test_mm_fr<fraction>(n, k, m); cout<< "Finished MMM using 1-D array of fractions" << endl; //Test Fraction
+    auto time_fr = test_mm_fr<fraction>(m, k, n); cout<< "Finished MMM using 1-D array of fractions" << endl; //Test Fraction
     end_time = chrono::steady_clock::now();
     time_map["1d-fraction"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
-    auto time_mfr = test_mm_mfr<mixed>(n, k, m); cout<< "Finished MMM using 1-D array of mixed fractions" << endl; //Test Fraction
+    auto time_mfr = test_mm_mfr<mixed>(m, k, n); cout<< "Finished MMM using 1-D array of mixed fractions" << endl; //Test Fraction
     end_time = chrono::steady_clock::now();
     time_map["1d-mixed"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    size_t dsize = n*k +k*m +2*n*m;
+    unordered_map<string, int> ndaccesses;
+    ndaccesses["fill_mat"] = m*k +k*n;
+    ndaccesses["print_pre-mat"] = m*k +k*n;
+    ndaccesses["comp_mat"] = m*k +k*n +2*n*m;  // read data from A(m,k), B(k,n), and C(m,n) and write it to C(m,n)
+    ndaccesses["print_post-mat"] = n*m;
+
+    size_t niterations = m*k*n;  // traditional matrix multiplication algo O(N^3)
+    unordered_map<string, int> ops;
+    ops["1d-int"] = 2*niterations;
+    ops["1d-float"] = 2*niterations;
+    ops["1d-fraction"] = 12*niterations;  //( 7 ops for addition and 5 ops for multiplication)
+    ops["1d-mixed"] = 43*niterations;  //(23 ops for addition and 20 ops for multiplication)
+
     cout<< endl << "Total Time " << endl;
     efficiency_analysis(time_map);
     cout<< endl << "1D-int Time " << endl;
-    efficiency_analysis(time_int, dsize, sizeof(int)); 
+    efficiency_analysis(time_int, ndaccesses, sizeof(int), ops["1d-int"]); 
     cout<< endl << "1D-float Time " << endl;
-    efficiency_analysis(time_fl, dsize, sizeof(float));
+    efficiency_analysis(time_fl, ndaccesses, sizeof(float), ops["1d-float"]);
     cout<< endl << "1D-fraction Time " << endl;
-    efficiency_analysis(time_fr, dsize, sizeof(fraction));
+    efficiency_analysis(time_fr, ndaccesses, sizeof(fraction), ops["1d-fraction"]);
     cout<< endl << "1D-mixed Time " << endl;
-    efficiency_analysis(time_mfr, dsize, sizeof(mixed));
+    efficiency_analysis(time_mfr, ndaccesses, sizeof(mixed), ops["1d-mixed"]);
     
     return 0;
 }
