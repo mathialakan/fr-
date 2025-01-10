@@ -43,7 +43,11 @@ auto comp_accuracy(T_fr val_fr, T_fp val_fp){
 template<typename T_r, typename T_pi>
 void test_encoding(T_r radius, T_pi pi_, T_r exact ){
     auto vol = cal_volume(radius, pi_);
-    cout<< "Volume of the sphare of radius " << radius << " is " << vol << " Accuracy: " << comp_accuracy(exact, vol) << " % "<< endl;
+    //cout << std::setprecision(34);
+    cout << std::setprecision(std::numeric_limits<long double>::digits10 + 1);
+    cout<< "Volume of the sphare of radius " << radius << " using PI = " << pi_ << " is " ;
+    cout << std::setprecision(10); cout << vol  ;
+    cout << std::setprecision(5); cout << " and  Accuracy: " << comp_accuracy(exact, vol) << " % "<< endl;
 }
 
 int main(){
@@ -53,7 +57,7 @@ int main(){
 
     auto vol_fr = cal_volume_fr(21, pi_fr);
     double vol_double = cast_double(vol_fr);
-    cout<< "Volume of the sphare of radius " << r << " is " << vol_fr << " in FP : " << vol_double <<  endl;
+    cout<< "Volume of the sphare of radius " << r << " using PI = " << pi_fr << " is " << vol_fr << " in FP : " << vol_double <<  endl;
 
     test_encoding<double>(21, pi_e15m112, vol_double);
     test_encoding<double>(21, pi_e11m52, vol_double);
