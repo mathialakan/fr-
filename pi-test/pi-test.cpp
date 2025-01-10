@@ -4,6 +4,8 @@ It uses pi in varying precisions and computed volume of a given sphare */
 1. float: single-precision floatin point number ~ 7 decimal digits of precision. 32 bits of memory
 2. double: double-precision floatin point number ~ 15 decimal digits of precision. 64 bits of memory
 */
+
+#include <cmath>
 #include <iostream>
 #include <iomanip>
 #include "../fraction/fr.h"
@@ -44,7 +46,7 @@ template<typename T_r, typename T_pi>
 void test_encoding(T_r radius, T_pi pi_, T_r exact ){
     auto vol = cal_volume(radius, pi_);
     //cout << std::setprecision(34);
-    cout << std::setprecision(std::numeric_limits<long double>::digits10 + 1);
+    cout << std::setprecision(std::numeric_limits<double>::digits10 + 1);
     cout<< "Volume of the sphare of radius " << radius << " using PI = " << pi_ << " is " ;
     cout << std::setprecision(10); cout << vol  ;
     cout << std::setprecision(5); cout << " and  Accuracy: " << comp_accuracy(exact, vol) << " % "<< endl;
