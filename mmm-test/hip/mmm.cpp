@@ -3,8 +3,11 @@
 #include <ctime>
 #include <cstdlib>
 #include <chrono>
-#include "../fraction/fr.h"
+#include "../../fraction/fr.h"
 #include <unordered_map>
+
+#include<hip/hip_runtime.h>
+#include<hip/hip_runtime_api.h>
 
 #if defined(X86)
 #include <immintrin.h>
@@ -60,106 +63,6 @@ bool fill_mat_mfr(mixed* A, int M, int N){
 }
 
 template<typename et>
-et* mat_mul(et* A, et* B, int M, int K, int N){
-
-    et* C = (et*)malloc(N*M *sizeof(et));
-    #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
-    #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
-    #endif
-
-    #if defined(OMP)
-        #pragma omp parallel for collapse(2) schedule(dynamic)
-    #elif defined(OMP_OL)
-        #pragma omp target teams distributed parallel for collapse(2) \
-            thread_limit(team_size) num_teams((N*M +1)/team_size) 
-    #elif defined(OACC)
-        #pragma acc parallel loop present(A, B, C) gang worker \
-                num_workers(team_size) vector_length(32)
-    #endif
-    for(int i=0; i<M; i++)
-        for(int j=0; j<N; j++){
-            C[N*i +j]= 0;
-            for(int k=0; k<K; k++)
-                C[N*i +j] += A[K*i + k] *B[N*k +j];  // 2 ops for prime type, 12 ops (7+5) for fraction, 47 ops (23 +24) for mixed numbers
-        }
-    return C;
-}
-
-template<typename et>
-et* mat_mul_i0(et* A, et* B, int M, int K, int N){
-
-    et* C = (et*)malloc(N*M *sizeof(et));
-    C = {0};
-    #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
-    #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
-    #endif
-
-    #if defined(OMP)
-        #pragma omp parallel for collapse(2) schedule(dynamic)
-    #elif defined(OMP_OL)
-        #pragma omp target teams distributed parallel for collapse(3) \
-            thread_limit(team_size) num_teams((N*M +1)/team_size) 
-    #elif defined(OACC)
-        #pragma acc parallel loop present(A, B, C) gang worker \
-                num_workers(team_size) vector_length(32)
-    #endif
-    for(int i=0; i<M; i++)
-        for(int j=0; j<N; j++){
-            //C[M*i +j]= 0;
-            #if defined(OMP)
-            #pragma omp simd
-            #elif defined(OMP_OL)
-            #pragma omp simd
-            #elif defined(OACC)
-            #pragma acc loop vector
-            #endif
-            for(int k=0; k<K; k++)
-                C[N*i +j] += A[K*i + k] *B[N*k +j]; 
-        }
-    return C;
-}
-
-
-template<typename et>
-et* mat_mul_avx(et* A, et* B, int M, int K, int N, int simd_len){  //simd_len = 8
-
-    et* C = (et*)malloc(N*M *sizeof(et));
-    C = {0};
-    #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
-    #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
-    #endif
-
-    #if defined(OMP)
-        #pragma omp parallel for collapse(2) schedule(dynamic)
-    #elif defined(OMP_OL)
-        #pragma omp target teams distributed parallel for collapse(3) \
-            thread_limit(team_size) num_teams((N*M +1)/team_size) 
-    #elif defined(OACC)
-        #pragma acc parallel loop present(A, B, C) gang worker \
-                num_workers(team_size) vector_length(32)
-    #endif
-    for(int i=0; i<M; i++)
-        for(int j=0; j<N; j++){
-            for(int k=0; k<K; k+=simd_len) 
-            //Vectorizing using AVX intrinsics
-            #if defined(X86)
-                __m256 av = _mm256_loadu_ps(A+ (K*i + k)); 
-                __m256 bv = _mm256_loadu_ps(B+ (M*k +j));
-                __m256 cv = _mm256_add_ps(av,bv);
-                _mm256_storeu_ps(C +(M*i +j), cv); 
-            #endif
-            C[N*i +j] += A[K*i + k] *B[N*k +j]; 
-        }
-    return C;
-}
-
-template<typename et>
 bool print_mat(et* A, int M, int N){
     for(int i=0; i<M; i++){
         for(int j=0; j<N; j++)
@@ -182,143 +85,6 @@ bool fill_mat(et** A){
         A[i][j] = 1+ (rand()%EMAX);
     
     return true;
-}
-template<typename et>
-et** mat_maul(et** A, et** B){
-
-    //int size_bytes = sizeof(A);
-    int M = sizeof(A)/sizeof(A[0]);
-    int K = sizeof(A[0])/sizeof(A[0][0]);
-    int N = sizeof(B)/sizeof(B[0])/sizeof(B[0][0]);
-
-    et** C = (et**) malloc(M*sizeof(et*));
-    for(int i=0; i<M; i++)
-        C[i] = (et*)malloc(N*sizeof(et));
-
-    #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n])
-    #elif defined(OACC)
-        #pragma acc enter data create(C[:n])
-    #endif
-
-    #if defined(OMP)
-        #pragma omp parallel for collapse(2) schedule(dynamic) 
-    #elif defined(OMP_OL)
-        #pragma omp target teams distribute parallel for \
-                thread_limit(team_size) num_teams((N*M +1)/team_size)
-    #elif defined(OACC)
-        #pragma acc parallel loop
-    #endif
-    for(int i=0; i<M; i++)
-        for(int j=0; j<N; j++){
-            C[i][j] = 0;
-            for(int k=0; k<K; k++)
-                C[i][j] += A[i][k]*B[k][j];
-        }
-    return C;        
-
-}
-
-/* Using cpp-style 1D pointer arrays */
-template<typename et>
-et* mat_mul_cpp(et* A, et* B, int M, int K, int N){
-
-    et* C = new et[N*M];
-    
-    #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
-    #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
-    #endif
-
-    #if defined(OMP)
-        #pragma omp parallel for collapse(2) schedule(dynamic)
-    #elif defined(OMP_OL)
-        #pragma omp taraget teams distribute parallel for \
-                thread_limit(team_size) num_teams((N*M +1)/team_size)
-    #elif defined(OACC)
-        #pragma acc parallel loop
-    #endif
-    for(int i=0; i<M; i++)
-    for(int j=0; j<N; j++){
-        C[M*i +j] = 0;
-        for(int k=0; k<K; k++)
-            C[N*i +j] += A[K*i+k]*B[N*k+j];
-    }
-    return C;
-
-}
-
-/* Using cpp-style 2D pointer arrays */
-template<typename et>
-et** mat_maul_cpp(et** A, et** B){
-
-    int M = sizeof(A)/sizeof(A[0]);
-    int K = sizeof(A[0])/sizeof(A[0][0]);
-    int N = sizeof(B)/sizeof(B[0])/sizeof(B[0][0]);
-
-    et** C =  new et*[M];
-    for (int i=0; i<M; i++)
-        C[i] = new et[N];
-
-    #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n])
-    #elif defined(OACC)
-        #pragma acc enter data create(C[:n])
-    #endif
-
-    #if defined(OMP)
-        #pragma omp parallel for collapse(2) schedule(dynamic)
-    #elif defined(OMP_OL)
-        #pragma omp taraget teams distribute parallel for \
-                thread_limit(team_size) num_teams((N*M +1)/team_size)
-    #elif defined(OACC)
-        #pragma acc parallel loop
-    #endif
-    for (int i=0; i<M; i++)
-        for( int j=0; j<N; j++){
-            C[i][j]=0;
-            for(int k=0; k<K; k++)
-                C[i][j] += A[i][k] * B[k][j]; 
-        }
-        
-    return C;
-}
-
-/* Using 1D vector*/
-template<typename et>
-vector<et> mat_mul(vector<et> A, vector<et> B){
-
-    
-}
-
-
-/* Using 2D vector*/
-template<typename et>
-vector<vector<et> > mat_mul(vector<vector<et> > A, vector<vector<et> > B){
-
-    //if (A.size()==0 || B.size()==0) return 0;
-    int M = A.size();
-    int K = A[0].size();
-    int N = B[0].size();
-    //if (K != B.size()) return 0;
-    vector<vector<et> > C(M, vector<et>(N));
-
-    #if defined(OMP)
-        #pragma omp parallel for collapse(2) schedule(dynamic)
-    #elif defined(OMP_OL)
-        #pragma omp taraget teams distribute parallel for \
-                thread_limit(team_size) num_teams((N*M +1)/team_size)
-    #elif defined(OACC)
-        #pragma acc parallel loop
-    #endif  
-    for(int i=0; i< M; ++i)
-        for(int j=0; j< N; ++j){
-           C[i][j] = 0;
-           for(int k=0; k< K; ++k)
-               C[i][j] += A[i][k] * B[k][j]; 
-        }
-    return C;
 }
 
 /* Using vector */
@@ -367,21 +133,59 @@ int print_mat(vector<vector<et> > A){
 }
 
 template<typename et>
-unordered_map<string, double> test_mm(int m, int k, int n){
+__global__ void mat_mul(et* A, et* B, et* C, int M, int K, int N){
+    int rows = blockIdx.y*blockDim.y + threadIdx.y;
+    int cols = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if ( rows < M && cols < N){
+        et s = 0;
+        for (int k=0; k < K; ++k)
+        s += A[rows*K +k] *B[k*N +cols];
+    }
+    C[rows*N +cols] = s;
+}
+
+template<typename et>
+__global__ void mat_mul_(et* A, et* B, et* C, int M, int K, int N){
+    int rows = blockIdx.y*blockDim.y + threadIdx.y;
+    int cols = blockIdx.x*blockDim.x + threadIdx.x;
+
+    for (int i = rows; i < M; i += blockDim.y*gridDim.y)
+    for (int j = cols; j < N; i += blockDim.x*gridDim.x){
+        et s = 0;
+        for (int k=0; k < K; ++k)
+            s += A[i*K +k] *B[j*N +k];
+
+        C[rows*N +cols] = s;
+    }
+}
+
+template<typename et>
+void mat_mul_hip(size_t grid_sz, size_t block_sz, et* A, et* B, et* C, int M, int K, int N){
+
+        mat_mul<et><<< grid_sz, block_sz>>>(A, B, C, M, K, N);
+        //mat_mul_<et><<< grid_sz, block_sz>>>(A, B, C, M, K, N);
+}
+
+template<typename et>
+unordered_map<string, double> test_mm( int m, int k, int n){
 
     unordered_map<string, double> time_local;
+    size_t block_sz = 1024;
+    size_t grid_sz = (m*n +1)/block_sz;
+    et* dA; et* dB; et* dC;
+    et* A; et* B; et* C;
+    hipMallocHost( (void**)&A, m*k* sizeof(et));
+    hipMallocHost( (void**)&B, k*n* sizeof(et));
+    hipMallocHost( (void**)&C, m*n* sizeof(et));
 
-    et* A = (et*)malloc( m*k* sizeof(et));
-    et* B = (et*)malloc( k*n* sizeof(et));
+    hipMalloc( (void**)&dA, m*k* sizeof(et));
+    hipMalloc( (void**)&dB, k*n* sizeof(et));
+    hipMalloc( (void**)&dC, m*n* sizeof(et));
+
     auto start_time = chrono::steady_clock::now();
-
     fill_mat(A, m, k);
     fill_mat(B, k, n);
-    #if defined(OMP_OL)
-        #prgama omp target enter data map(to:A[0:m*k],B[0:k*n])
-    #elif defined(OACC)
-        #pragma acc enter data copyin(A[:m*k],B[:k*n])
-    #endif
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
@@ -393,44 +197,58 @@ unordered_map<string, double> test_mm(int m, int k, int n){
     time_local["print_pre-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    auto C = mat_mul<et>(A, B, m, k, n);
+    hipMemcpy(dA, A, m*k* sizeof(et), hipMemcpyHostToDevice);
+    hipMemcpy(dB, B, k*n* sizeof(et), hipMemcpyHostToDevice);
+
     end_time = chrono::steady_clock::now();
-    time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    time_local["h2d"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+
+    mat_mul_hip<et>(grid_sz, block_sz, dA, dB, dC, m, k, n);
+    end_time = chrono::steady_clock::now();
+    time_local["comp_at"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+
+    hipMemcpy( C, dC, m*n* sizeof(et), hipMemcpyDeviceToHost);
+    end_time = chrono::steady_clock::now();
+    time_local["d2h"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
     cout << "Result" << endl;
-    #if defined(OMP_OL)
-        #prgama omp target update from(C[0:n*m])
-    #elif defined(OACC)
-        #pragma acc update self(C[0:n*m])
-    #endif
     print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
-    //start_time = end_time;
 
-    #if defined(OMP_OL)
-        #prgama omp target exit data map(delete:A[0:m*k],B[0:k*n],C[0:m*n])
-    #elif defined(OACC)
-        #pragma acc exit data delete(A[:m*k],B[:k*n],C[0:m*n])
-    #endif
+    //Cleaning up
+    hipFreeHost(A);
+    hipFreeHost(B);
+    hipFreeHost(C);
+    hipFree(dA);
+    hipFree(dB);
+    hipFree(dC);
 
     return time_local;
+
 }
 
 template<typename et>
-unordered_map<string, double> test_mm_fr(int m, int k, int n){
+unordered_map<string, double> test_mm_fr( int m, int k, int n){
 
+    et test = 0;
     unordered_map<string, double> time_local;
-    //et* A; 
-    //et* B;
+    size_t block_sz = 1024;
+    size_t grid_sz = (m*n +1)/block_sz;
+    et* dA; et* dB; et* dC;
+    et* A; et* B; et* C;
+    hipMallocHost( (void**)&A, m*k* sizeof(et));
+    hipMallocHost( (void**)&B, k*n* sizeof(et));
+    hipMallocHost( (void**)&C, m*n* sizeof(et));
 
-    et* A = (et*)malloc( m*k* sizeof(et));
-    et* B = (et*)malloc( k*n* sizeof(et));
+    hipMalloc( (void**)&dA, m*k* sizeof(et));
+    hipMalloc( (void**)&dB, k*n* sizeof(et));
+    hipMalloc( (void**)&dC, m*n* sizeof(et));
+
     auto start_time = chrono::steady_clock::now();
     fill_mat_fr(A, m, k);
-    fill_mat_fr(B, k, n); 
-
+    fill_mat_fr(B, k, n);
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
@@ -442,34 +260,61 @@ unordered_map<string, double> test_mm_fr(int m, int k, int n){
     time_local["print_pre-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    auto C = mat_mul<et>(A, B, m, k, n);
+    hipMemcpy(dA, A, m*k* sizeof(et), hipMemcpyHostToDevice);
+    hipMemcpy(dB, B, k*n* sizeof(et), hipMemcpyHostToDevice);
+
     end_time = chrono::steady_clock::now();
-    time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    time_local["h2d"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+
+    mat_mul_hip<et>(grid_sz, block_sz, dA, dB, dC, m, k, n);
+    end_time = chrono::steady_clock::now();
+    time_local["comp_at"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+
+    hipMemcpy( C, dC, m*n* sizeof(et), hipMemcpyDeviceToHost);
+    end_time = chrono::steady_clock::now();
+    time_local["d2h"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
     cout << "Result" << endl;
     print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
-    //start_time = end_time;
+
+    //Cleaning up
+    hipFreeHost(A);
+    hipFreeHost(B);
+    hipFreeHost(C);
+    hipFree(dA);
+    hipFree(dB);
+    hipFree(dC);
 
     return time_local;
+
 }
 
 template<typename et>
-unordered_map<string, double> test_mm_mfr(int m, int k, int n){
+unordered_map<string, double> test_mm_mfr( int m, int k, int n){
 
     unordered_map<string, double> time_local;
+    size_t block_sz = 1024;
+    size_t grid_sz = (m*n +1)/block_sz;
+    et* dA; et* dB; et* dC;
+    et* A; et* B; et* C;
+    hipMallocHost( (void**)&A, m*k* sizeof(et));
+    hipMallocHost( (void**)&B, k*n* sizeof(et));
+    hipMallocHost( (void**)&C, m*n* sizeof(et));
 
-    et* A = (et*)malloc( m*k* sizeof(et));
-    et* B = (et*)malloc( k*n* sizeof(et));
+    hipMalloc( (void**)&dA, m*k* sizeof(et));
+    hipMalloc( (void**)&dB, k*n* sizeof(et));
+    hipMalloc( (void**)&dC, m*n* sizeof(et));
+
     auto start_time = chrono::steady_clock::now();
     fill_mat_mfr(A, m, k);
-    fill_mat_mfr(B, k, n); 
+    fill_mat_mfr(B, k, n);
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
-    
+
     print_mat<et>(A, m, k);
     cout<<endl;
     print_mat<et>(B, k, n);
@@ -477,18 +322,36 @@ unordered_map<string, double> test_mm_mfr(int m, int k, int n){
     time_local["print_pre-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
-    auto C = mat_mul<et>(A, B, m, k, n);
+    hipMemcpy(dA, A, m*k* sizeof(et), hipMemcpyHostToDevice);
+    hipMemcpy(dB, B, k*n* sizeof(et), hipMemcpyHostToDevice);
+
     end_time = chrono::steady_clock::now();
-    time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    time_local["h2d"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+
+    mat_mul_hip<et>(grid_sz, block_sz, dA, dB, dC, m, k, n);
+    end_time = chrono::steady_clock::now();
+    time_local["comp_at"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+
+    hipMemcpy( C, dC, m*n* sizeof(et), hipMemcpyDeviceToHost);
+    end_time = chrono::steady_clock::now();
+    time_local["d2h"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
 
     cout << "Result" << endl;
     print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
-    //start_time = end_time;
-    
+
+    //Cleaning up
+    hipFreeHost(A);
+    hipFreeHost(B);
+    hipFreeHost(C);
+    hipFree(dA);
+    hipFree(dB);
+    hipFree(dC);
+
     return time_local;
+
 }
 
 void efficiency_analysis(unordered_map<string, double> time_map ){
@@ -610,6 +473,8 @@ int main(int argc, char* argv[]){
     efficiency_analysis(time_fr, ndaccesses, sizeof(fraction), ops["1d-fraction"]);
     cout<< endl << "1D-mixed Time " << endl;
     efficiency_analysis(time_mfr, ndaccesses, sizeof(mixed), ops["1d-mixed"]);
-    
+   
+    //-------------- CUDA ----------------//
+    //------------------------------------//
     return 0;
 }

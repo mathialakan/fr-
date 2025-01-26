@@ -3,7 +3,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <chrono>
-#include "../fraction/fr.h"
+#include "../../fraction/fr.h"
 #include <unordered_map>
 
 #if defined(X86)

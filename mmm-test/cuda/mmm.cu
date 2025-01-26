@@ -6,6 +6,7 @@
 #include "../../fraction/fr.h"
 #include <unordered_map>
 
+#include <cuda.h>
 #if defined(X86)
 #include <immintrin.h>
 #endif
@@ -134,9 +135,8 @@ __global__ void mat_mul(et* A, et* B, et* C, int M, int K, int N){
     int rows = blockIdx.y*blockDim.y + threadIdx.y;
     int cols = blockIdx.x*blockDim.x + threadIdx.x;
 
-    et s = 1;
     if ( rows < M && cols < N){
-        s = 0;
+        et s = 0;
         for (int k=0; k < K; ++k)
         s += A[rows*K +k] *B[k*N +cols];
     }
@@ -150,8 +150,7 @@ __global__ void mat_mul_(et* A, et* B, et* C, int M, int K, int N){
 
     for (int i = rows; i < M; i += blockDim.y*gridDim.y)
     for (int j = cols; j < N; i += blockDim.x*gridDim.x){
-        et s = 1;
-	s += 0;
+        et s = 0;
         for (int k=0; k < K; ++k)
             s += A[i*K +k] *B[j*N +k];
 
