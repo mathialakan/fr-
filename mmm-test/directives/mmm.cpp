@@ -62,17 +62,18 @@ bool fill_mat_mfr(mixed* A, int M, int N){
 template<typename et>
 et* mat_mul(et* A, et* B, int M, int K, int N){
 
-    et* C = (et*)malloc(N*M *sizeof(et));
+    size_t nel = N*M;
+    et* C = (et*)malloc(nel*sizeof(et));
     #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
+        #pragma omp target enter data map(alloc: C[:nel])
     #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
+        #pragma acc enter data create(C[:nel])
     #endif
 
     #if defined(OMP)
         #pragma omp parallel for collapse(2) schedule(dynamic)
     #elif defined(OMP_OL)
-        #pragma omp target teams distributed parallel for collapse(2) \
+        #pragma omp target teams distribute parallel for collapse(2) \
             thread_limit(team_size) num_teams((N*M +1)/team_size) 
     #elif defined(OACC)
         #pragma acc parallel loop present(A, B, C) gang worker \
@@ -90,18 +91,19 @@ et* mat_mul(et* A, et* B, int M, int K, int N){
 template<typename et>
 et* mat_mul_i0(et* A, et* B, int M, int K, int N){
 
-    et* C = (et*)malloc(N*M *sizeof(et));
+    size_t nel = N*M;
+    et* C = (et*)malloc(nel*sizeof(et));
     C = {0};
     #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
+        #pragma omp target enter data map(alloc: C[:nel])
     #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
+        #pragma acc enter data create(C[:nel])
     #endif
 
     #if defined(OMP)
         #pragma omp parallel for collapse(2) schedule(dynamic)
     #elif defined(OMP_OL)
-        #pragma omp target teams distributed parallel for collapse(3) \
+        #pragma omp target teams distribute parallel for collapse(2) \
             thread_limit(team_size) num_teams((N*M +1)/team_size) 
     #elif defined(OACC)
         #pragma acc parallel loop present(A, B, C) gang worker \
@@ -126,19 +128,20 @@ et* mat_mul_i0(et* A, et* B, int M, int K, int N){
 
 template<typename et>
 et* mat_mul_avx(et* A, et* B, int M, int K, int N, int simd_len){  //simd_len = 8
-
-    et* C = (et*)malloc(N*M *sizeof(et));
+  
+    size_t nel = N*M;
+    et* C = (et*)malloc(nel*sizeof(et));
     C = {0};
     #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
+        #pragma omp target enter data map(alloc: C[:nel])
     #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
+        #pragma acc enter data create(C[:nel])
     #endif
 
     #if defined(OMP)
         #pragma omp parallel for collapse(2) schedule(dynamic)
     #elif defined(OMP_OL)
-        #pragma omp target teams distributed parallel for collapse(3) \
+        #pragma omp target teams distribute parallel for collapse(3) \
             thread_limit(team_size) num_teams((N*M +1)/team_size) 
     #elif defined(OACC)
         #pragma acc parallel loop present(A, B, C) gang worker \
@@ -196,9 +199,9 @@ et** mat_maul(et** A, et** B){
         C[i] = (et*)malloc(N*sizeof(et));
 
     #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n])
+        #pragma omp target enter data map(alloc: C[:M][:N])
     #elif defined(OACC)
-        #pragma acc enter data create(C[:n])
+        #pragma acc enter data create(C[:M][:N])
     #endif
 
     #if defined(OMP)
@@ -223,18 +226,19 @@ et** mat_maul(et** A, et** B){
 template<typename et>
 et* mat_mul_cpp(et* A, et* B, int M, int K, int N){
 
-    et* C = new et[N*M];
+    size_t nel = N*M;
+    et* C = new et[nel];
     
     #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n*m])
+        #pragma omp target enter data map(alloc: C[:nel])
     #elif defined(OACC)
-        #pragma acc enter data create(C[:n*m])
+        #pragma acc enter data create(C[:nel])
     #endif
 
     #if defined(OMP)
         #pragma omp parallel for collapse(2) schedule(dynamic)
     #elif defined(OMP_OL)
-        #pragma omp taraget teams distribute parallel for \
+        #pragma omp target teams distribute parallel for \
                 thread_limit(team_size) num_teams((N*M +1)/team_size)
     #elif defined(OACC)
         #pragma acc parallel loop
@@ -262,15 +266,15 @@ et** mat_maul_cpp(et** A, et** B){
         C[i] = new et[N];
 
     #if defined(OMP_OL)
-        #pragma omp target enter data map(alloc: C[:n])
+        #pragma omp target enter data map(alloc: C[:M][:N])
     #elif defined(OACC)
-        #pragma acc enter data create(C[:n])
+        #pragma acc enter data create(C[:M][:N])
     #endif
 
     #if defined(OMP)
         #pragma omp parallel for collapse(2) schedule(dynamic)
     #elif defined(OMP_OL)
-        #pragma omp taraget teams distribute parallel for \
+        #pragma omp target teams distribute parallel for \
                 thread_limit(team_size) num_teams((N*M +1)/team_size)
     #elif defined(OACC)
         #pragma acc parallel loop
@@ -303,11 +307,16 @@ vector<vector<et> > mat_mul(vector<vector<et> > A, vector<vector<et> > B){
     int N = B[0].size();
     //if (K != B.size()) return 0;
     vector<vector<et> > C(M, vector<et>(N));
+    #if defined(OMP_OL)
+        #pragma omp target enter data map(alloc: C)
+    #elif defined(OACC)
+        #pragma acc enter data create(C)
+    #endif
 
     #if defined(OMP)
         #pragma omp parallel for collapse(2) schedule(dynamic)
     #elif defined(OMP_OL)
-        #pragma omp taraget teams distribute parallel for \
+        #pragma omp target teams distribute parallel for \
                 thread_limit(team_size) num_teams((N*M +1)/team_size)
     #elif defined(OACC)
         #pragma acc parallel loop
@@ -378,7 +387,7 @@ unordered_map<string, double> test_mm(int m, int k, int n){
     fill_mat(A, m, k);
     fill_mat(B, k, n);
     #if defined(OMP_OL)
-        #prgama omp target enter data map(to:A[0:m*k],B[0:k*n])
+        #pragma omp target enter data map(to:A[0:m*k],B[0:k*n])
     #elif defined(OACC)
         #pragma acc enter data copyin(A[:m*k],B[:k*n])
     #endif
@@ -400,7 +409,7 @@ unordered_map<string, double> test_mm(int m, int k, int n){
 
     cout << "Result" << endl;
     #if defined(OMP_OL)
-        #prgama omp target update from(C[0:n*m])
+        #pragma omp target update from(C[0:n*m])
     #elif defined(OACC)
         #pragma acc update self(C[0:n*m])
     #endif
@@ -410,7 +419,7 @@ unordered_map<string, double> test_mm(int m, int k, int n){
     //start_time = end_time;
 
     #if defined(OMP_OL)
-        #prgama omp target exit data map(delete:A[0:m*k],B[0:k*n],C[0:m*n])
+        #pragma omp target exit data map(delete:A[0:m*k],B[0:k*n],C[0:m*n])
     #elif defined(OACC)
         #pragma acc exit data delete(A[:m*k],B[:k*n],C[0:m*n])
     #endif
@@ -431,6 +440,12 @@ unordered_map<string, double> test_mm_fr(int m, int k, int n){
     fill_mat_fr(A, m, k);
     fill_mat_fr(B, k, n); 
 
+    #if defined(OMP_OL)
+        #pragma omp target enter data map(to:A[0:m*k],B[0:k*n])
+    #elif defined(OACC)
+        #pragma acc enter data copyin(A[:m*k],B[:k*n])
+    #endif
+
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
@@ -448,11 +463,21 @@ unordered_map<string, double> test_mm_fr(int m, int k, int n){
     start_time = end_time;
 
     cout << "Result" << endl;
+    #if defined(OMP_OL)
+        #pragma omp target update from(C[0:n*m])
+    #elif defined(OACC)
+        #pragma acc update self(C[0:n*m])
+    #endif
     print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     //start_time = end_time;
 
+    #if defined(OMP_OL)
+        #pragma omp target exit data map(delete:A[0:m*k],B[0:k*n],C[0:m*n])
+    #elif defined(OACC)
+        #pragma acc exit data delete(A[:m*k],B[:k*n],C[0:m*n])
+    #endif
     return time_local;
 }
 
@@ -466,6 +491,12 @@ unordered_map<string, double> test_mm_mfr(int m, int k, int n){
     auto start_time = chrono::steady_clock::now();
     fill_mat_mfr(A, m, k);
     fill_mat_mfr(B, k, n); 
+    #if defined(OMP_OL)
+        #pragma omp target enter data map(to:A[0:m*k],B[0:k*n])
+    #elif defined(OACC)
+        #pragma acc enter data copyin(A[:m*k],B[:k*n])
+    #endif
+
     auto end_time = chrono::steady_clock::now();
     time_local["fill_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     start_time = end_time;
@@ -483,11 +514,21 @@ unordered_map<string, double> test_mm_mfr(int m, int k, int n){
     start_time = end_time;
 
     cout << "Result" << endl;
+    #if defined(OMP_OL)
+        #pragma omp target update from(C[0:n*m])
+    #elif defined(OACC)
+        #pragma acc update self(C[0:n*m])
+    #endif
     print_mat<et>(C, m, n);
     end_time = chrono::steady_clock::now();
     time_local["print_post-mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
     //start_time = end_time;
     
+    #if defined(OMP_OL)
+        #pragma omp target exit data map(delete:A[0:m*k],B[0:k*n],C[0:m*n])
+    #elif defined(OACC)
+        #pragma acc exit data delete(A[:m*k],B[:k*n],C[0:m*n])
+    #endif
     return time_local;
 }
 

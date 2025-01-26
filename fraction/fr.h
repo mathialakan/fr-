@@ -2,18 +2,20 @@
 #define FR_H
 
 #include <iostream>
+#include <cassert>
 //Compute GCD
 int gcd_(int a, int b){ int t; while(b != 0){ t = b; b = a%b; a = t; } return abs(a);}  
 
 //User defined assert function
-void assert_fr(bool expr, std::string msg){ if (!expr) std::cerr<< msg;}
+//void assert_fr(bool expr, std::string msg){ if (!expr) std::cerr<< msg;}
 
 /*Proper and improper fractions  - 8 bytes (Current representation uses int as a base type (2 ints = 8 bytes) --- we need to consider proper base data-type to reduce the size)*/
 struct fraction
 {
     int n; int d;
     fraction() {}
-    fraction(int n, int d) : n(n), d(d) {assert_fr(d!=0, "denominator shouldn't be zero");}
+    fraction(int n, int d) : n(n), d(d) {assert(d!=0);}
+    //fraction(int n, int d) : n(n), d(d) {assert_fr(d!=0, "denominator shouldn't be zero");}
 
     //Simplify the fraction to equivalent smallest fraction
     fraction trim(){ int gcd__ = gcd_((int)n, (int)d); return fraction(n/gcd__, d/gcd__);};

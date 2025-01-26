@@ -5,17 +5,17 @@ CXX= mpicxx
 CXXFLAGS = -std=c++20
 
 SRC = $(wildcard *.cpp)
-INC = ../fraction/$(wildcard *fr.h)
+INC = ../../fraction/$(wildcard *fr.h)
 OBJ = $(SRC:.cpp=.o)
 
-API="OMP_OL"
-COMPILER=icp
-SYS=pvc
+#API=OMP_OL
+#COMPILER=icp
+#SYS=pvc
 
-ifeq ($(API), "OMP_OL")
-	CXXFLAGS +=-fiopenmp -fopenmp-targets=spir64_gen -Xopenmp-target-backend=spir64_gen "-device 12.60.7"
-else ifeq($(API), "OMP")
-	CXXFLAGS +=-fiopenmp
+ifeq ($(API), OMP_OL)
+	CXXFLAGS +=-fiopenmp -fopenmp-targets=spir64_gen -Xopenmp-target-backend=spir64_gen "-device 12.60.7" -DOMP_OL
+else ifeq ($(API), OMP)
+	CXXFLAGS +=-fiopenmp -DOMP
 endif
 
 EX=mmm_$(API)_$(COMPILER)_$(SYS)
