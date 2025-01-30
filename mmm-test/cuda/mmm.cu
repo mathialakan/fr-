@@ -135,8 +135,9 @@ __global__ void mat_mul(et* A, et* B, et* C, int M, int K, int N){
     int rows = blockIdx.y*blockDim.y + threadIdx.y;
     int cols = blockIdx.x*blockDim.x + threadIdx.x;
 
+        et s;
     if ( rows < M && cols < N){
-        et s = 0;
+        s = 0;
         for (int k=0; k < K; ++k)
         s += A[rows*K +k] *B[k*N +cols];
     }
@@ -149,28 +150,34 @@ __global__ void mat_mul_(et* A, et* B, et* C, int M, int K, int N){
     int cols = blockIdx.x*blockDim.x + threadIdx.x;
 
     for (int i = rows; i < M; i += blockDim.y*gridDim.y)
-    for (int j = cols; j < N; i += blockDim.x*gridDim.x){
-        et s = 0;
-        for (int k=0; k < K; ++k)
+    for (int j = cols; j < N; j += blockDim.x*gridDim.x){
+        et s;
+        s = 0;
+	//printf("s : %d \n", s);
+        for (int k=0; k < K; ++k){
+            //s = B[j*N +k];
+            //s = A[i*K +k] ;
             s += A[i*K +k] *B[j*N +k];
-
-        C[rows*N +cols] = s;
+	//printf("s : %d \n", s);
+	}
+        C[i*N +j] = s;
     }
 }
 
 template<typename et>
 void mat_mul_cuda(size_t grid_sz, size_t block_sz, et* A, et* B, et* C, int M, int K, int N){
 
-        mat_mul<et><<< grid_sz, block_sz>>>(A, B, C, M, K, N);
-        //mat_mul_<et><<< grid_sz, block_sz>>>(A, B, C, M, K, N);
+        //mat_mul<et><<< grid_sz, block_sz>>>(A, B, C, M, K, N);
+        mat_mul_<et><<< grid_sz, block_sz>>>(A, B, C, M, K, N);
 }
 
 template<typename et>
 unordered_map<string, double> test_mm( int m, int k, int n){
 
     unordered_map<string, double> time_local;
-    size_t block_sz = 1024;
-    size_t grid_sz = (m*n +1)/block_sz;
+    int nele = m*n;
+    size_t block_sz = (nele < 1024) ? nele : 1024;
+    size_t grid_sz = (nele +1)/block_sz;
     et* dA; et* dB; et* dC;
     et* A; et* B; et* C;
     cudaMallocHost( (void**)&A, m*k* sizeof(et));
@@ -203,7 +210,7 @@ unordered_map<string, double> test_mm( int m, int k, int n){
 
     mat_mul_cuda<et>(grid_sz, block_sz, dA, dB, dC, m, k, n);
     end_time = chrono::steady_clock::now();
-    time_local["comp_at"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
 
     cudaMemcpy( C, dC, m*n* sizeof(et), cudaMemcpyDeviceToHost);
     end_time = chrono::steady_clock::now();
@@ -230,10 +237,10 @@ unordered_map<string, double> test_mm( int m, int k, int n){
 template<typename et>
 unordered_map<string, double> test_mm_fr( int m, int k, int n){
 
-    et test = 0;
     unordered_map<string, double> time_local;
-    size_t block_sz = 1024;
-    size_t grid_sz = (m*n +1)/block_sz;
+    int nele = n*m;
+    size_t block_sz = (nele < 1024) ? nele : 1024;
+    size_t grid_sz = (nele +1)/block_sz;
     et* dA; et* dB; et* dC;
     et* A; et* B; et* C;
     cudaMallocHost( (void**)&A, m*k* sizeof(et));
@@ -266,7 +273,7 @@ unordered_map<string, double> test_mm_fr( int m, int k, int n){
 
     mat_mul_cuda<et>(grid_sz, block_sz, dA, dB, dC, m, k, n);
     end_time = chrono::steady_clock::now();
-    time_local["comp_at"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
 
     cudaMemcpy( C, dC, m*n* sizeof(et), cudaMemcpyDeviceToHost);
     end_time = chrono::steady_clock::now();
@@ -294,8 +301,9 @@ template<typename et>
 unordered_map<string, double> test_mm_mfr( int m, int k, int n){
 
     unordered_map<string, double> time_local;
-    size_t block_sz = 1024;
-    size_t grid_sz = (m*n +1)/block_sz;
+    int nele = m*n;
+    size_t block_sz = (nele < 1024) ? nele : 1024;
+    size_t grid_sz = (nele +1)/block_sz;
     et* dA; et* dB; et* dC;
     et* A; et* B; et* C;
     cudaMallocHost( (void**)&A, m*k* sizeof(et));
@@ -328,7 +336,7 @@ unordered_map<string, double> test_mm_mfr( int m, int k, int n){
 
     mat_mul_cuda<et>(grid_sz, block_sz, dA, dB, dC, m, k, n);
     end_time = chrono::steady_clock::now();
-    time_local["comp_at"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    time_local["comp_mat"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
 
     cudaMemcpy( C, dC, m*n* sizeof(et), cudaMemcpyDeviceToHost);
     end_time = chrono::steady_clock::now();
@@ -450,9 +458,11 @@ int main(int argc, char* argv[]){
 
     unordered_map<string, int> ndaccesses;
     ndaccesses["fill_mat"] = m*k +k*n;
-    ndaccesses["print_pre-mat"] = m*k +k*n;
+    ndaccesses["h2d"] = m*k +k*n;
+    ndaccesses["print_pre-mat"] = n*m;
     ndaccesses["comp_mat"] = m*k +k*n +2*n*m;  // read data from A(m,k), B(k,n), and C(m,n) and write it to C(m,n)
     ndaccesses["print_post-mat"] = n*m;
+    ndaccesses["d2h"] = n*m;
 
     size_t niterations = m*k*n;  // traditional matrix multiplication algo O(N^3)
     unordered_map<string, int> ops;

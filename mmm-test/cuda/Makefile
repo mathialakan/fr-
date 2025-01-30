@@ -1,7 +1,7 @@
 
 #CC= cpp -P
 
-CXXFLAGS = -std=c++14
+CXXFLAGS = -std=c++20
 
 SRC = $(wildcard *.cu)
 INC = ../../fraction/$(wildcard *fr.h)
