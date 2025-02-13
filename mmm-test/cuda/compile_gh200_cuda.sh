@@ -9,4 +9,6 @@ export COMPILER=nvcc
 export API=CUDA
 export SYS=gh200
 
+export TYPE=$1
+
 make

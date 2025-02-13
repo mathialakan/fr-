@@ -399,44 +399,9 @@ void efficiency_analysis(unordered_map<string, double> time_map , unordered_map<
     
 }
 
-int main(int argc, char* argv[]){
-    
-    int m, k, n;
-    switch (argc){
-            case 1:
-                 m = 100; n = 100; k=100; break;
-            case 2:
-                 m = atoi(argv[1]); k = m; n = m; break;
-            case 3:
-                 m = atoi(argv[1]); k = atoi(argv[2]); n = m; break;
-            case 4:
-                 m = atoi(argv[1]); k = atoi(argv[2]); n = atoi(argv[3]); break;
-            case 5:
-                if(atoi(argv[2]) != atoi(argv[3])) {
-		       	cout<< "Number of columns of the first matrix should be equal to the number of rows of the second matrix" << endl;
-                  	return 0;
-		}else
-		{
-			m = atoi(argv[1]); k = atoi(argv[2]); n = atoi(argv[4]); break;
-		}	
-            default: break;
-    }           
 
-    // 2D-Vector of floats
-    /*
-    vector<vector<float> > A(m, vector<float>(k));
-    vector<vector<float> > B(k, vector<float>(n));
+void test_all(int m, int k, int n){
 
-    //if (read_mat(A) == 1) cout<< "Reading is failed" << endl;
-    //if (read_mat(B) == 1) cout<< "Reading is failed" << endl;
-    fill_mat(A);
-    fill_mat(B);
-
-    auto C = mat_mul(A,B);
-    cout << "Result" << endl;
-    print_mat((vector<vector<float> >)C);
-    */
-//*
     unordered_map<string, double> time_map;
     auto start_time = chrono::steady_clock::now();
     auto time_int = test_mm<int>(m, k, n); cout<< "Finished MMM using 1-D array of integers" << endl; //Test 1-D array
@@ -474,14 +439,104 @@ int main(int argc, char* argv[]){
     cout<< endl << "Total Time " << endl;
     efficiency_analysis(time_map);
     cout<< endl << "1D-int Time " << endl;
-    efficiency_analysis(time_int, ndaccesses, sizeof(int), ops["1d-int"]); 
+    efficiency_analysis(time_int, ndaccesses, sizeof(int), ops["1d-int"]);
     cout<< endl << "1D-float Time " << endl;
     efficiency_analysis(time_fl, ndaccesses, sizeof(float), ops["1d-float"]);
     cout<< endl << "1D-fraction Time " << endl;
     efficiency_analysis(time_fr, ndaccesses, sizeof(fraction), ops["1d-fraction"]);
     cout<< endl << "1D-mixed Time " << endl;
     efficiency_analysis(time_mfr, ndaccesses, sizeof(mixed), ops["1d-mixed"]);
-   
+
+}
+
+int main(int argc, char* argv[]){
+
+    int m, k, n;
+    switch (argc){
+            case 1:
+                 m = 100; n = 100; k=100; break;
+            case 2:
+                 m = atoi(argv[1]); k = m; n = m; break;
+            case 3:
+                 m = atoi(argv[1]); k = atoi(argv[2]); n = m; break;
+            case 4:
+                 m = atoi(argv[1]); k = atoi(argv[2]); n = atoi(argv[3]); break;
+            case 5:
+                if(atoi(argv[2]) != atoi(argv[3])) {
+		       	cout<< "Number of columns of the first matrix should be equal to the number of rows of the second matrix" << endl;
+                  	return 0;
+		}else
+		{
+			m = atoi(argv[1]); k = atoi(argv[2]); n = atoi(argv[4]); break;
+		}
+            default: break;
+    }
+
+    // 2D-Vector of floats
+    /*
+    vector<vector<float> > A(m, vector<float>(k));
+    vector<vector<float> > B(k, vector<float>(n));
+
+    //if (read_mat(A) == 1) cout<< "Reading is failed" << endl;
+    //if (read_mat(B) == 1) cout<< "Reading is failed" << endl;
+    fill_mat(A);
+    fill_mat(B);
+
+    auto C = mat_mul(A,B);
+    cout << "Result" << endl;
+    print_mat((vector<vector<float> >)C);
+    */
+//*
+    string test_case;
+    int ops_it;
+    unordered_map<string, double> time_map;
+    auto start_time = chrono::steady_clock::now();
+    size_t sizet;
+    unordered_map<string, double> time_exe;
+// default
+#if defined(INT_1D)
+    test_case = "1-D array of integers";
+    ops_it = 2;
+    sizet = sizeof(int);
+    time_exe = test_mm<int>(m, k, n);
+#elif defined(FLOAT_1D)
+    test_case = "1-D array of floats";
+    ops_it = 2;
+    sizet = sizeof(float);
+    time_exe = test_mm<float>(m, k, n);
+#elif defined(FRACTION_1D)
+    test_case = "1-D array of fractions";
+    ops_it = 12;
+    sizet = sizeof(fraction);
+    time_exe = test_mm_fr<fraction>(m, k, n);
+#elif defined(MIXED_1D)
+    test_case = "1-D array of mixed";
+    ops_it = 43;
+    sizet = sizeof(int);
+    time_exe = test_mm_mfr<mixed>(m, k, n);
+#elif defined(DOUBLE_1D)
+    test_case = "1-D array of double";
+    ops_it = 2;
+    sizet = sizeof(int);
+    time_exe = test_mm_fr<double>(m, k, n);
+#endif
+    auto end_time = chrono::steady_clock::now();
+    auto time_total = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    cout<< "Finished MMM using " << test_case << endl; //Test 1-D array
+
+    unordered_map<string, int> ndaccesses;
+    ndaccesses["fill_mat"] = m*k +k*n;
+    ndaccesses["h2d"] = m*k +k*n;
+    ndaccesses["print_pre-mat"] = n*m;
+    ndaccesses["comp_mat"] = m*k +k*n +2*n*m;  // read data from A(m,k), B(k,n), and C(m,n) and write it to C(m,n)
+    ndaccesses["print_post-mat"] = n*m;
+    ndaccesses["d2h"] = n*m;
+
+    size_t niterations = m*k*n;  // traditional matrix multiplication algo O(N^3)
+    int ops = ops_it*niterations;
+
+    cout<< endl << " Time " << endl;
+    efficiency_analysis(time_exe, ndaccesses, sizet, ops);
     //-------------- CUDA ----------------//
     //------------------------------------//
     return 0;

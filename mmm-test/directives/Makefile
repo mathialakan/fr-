@@ -1,4 +1,3 @@
-
 CC= cpp -P
 #CXX= mpicxx
 
@@ -24,10 +23,10 @@ else ifeq ($(COMPILER), llvm)
 	CXX = clang++
 	CXXFLAGS += -Ofast -std=c++17 -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda --cuda-path=$(CUDA_PATH) -Xcuda-ptxas --maxrregcount=64 # -fopenmp-new-driver -foffload-lto -fopenmp-assume-no-thread-state
 else ifeq ($(COMPILER), AOMP)
-      CPP=clang++  -fopenmp -target x86_64-pc-linux-gnu -fopenmp-targets=amdgcn-amd-amdhsa -Xopenmp-target=amdgcn-amd-amdhsa -march=gfx908
+      CPP=clang++  -fopenmp -target x86_64-pc-linux-gnu -fopenmp-targets=amdgcn-amd-amdhsa -Xopenmp-target=amdgcn-amd-amdhsa -march=$(ARCH) #gfx908
 endif
 else ifeq ($(API), OMP)
-	CXXFLAGS +=-fiopenmp -DOMP
+        CXXFLAGS +=-fiopenmp -DOMP
 endif
 
 EX=mmm_$(API)_$(COMPILER)_$(SYS)
@@ -42,5 +41,3 @@ $(OBJ): $(INC)
 
 clean:
 	rm -f *.o *~ ./$(EX)
-
-
