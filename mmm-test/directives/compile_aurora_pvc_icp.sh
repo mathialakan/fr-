@@ -1,9 +1,9 @@
 #!/bib/bash
+#
 
-
-export COMPILER=nvhpc
+export SYS=pvc
+export COMPILER=icp
 export API=OMP_OL
-export SYS=a100
 
 export TYPE=$1
 

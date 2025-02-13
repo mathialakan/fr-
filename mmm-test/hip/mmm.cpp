@@ -401,6 +401,53 @@ void efficiency_analysis(unordered_map<string, double> time_map , unordered_map<
     
 }
 
+void test_all(int n, int k, int m){
+
+    unordered_map<string, double> time_map;
+    auto start_time = chrono::steady_clock::now();
+    auto time_int = test_mm<int>(m, k, n); cout<< "Finished MMM using 1-D array of integers" << endl; //Test 1-D array
+    auto end_time = chrono::steady_clock::now();
+    time_map["1d-int"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    start_time = end_time;
+    auto time_fl = test_mm<float>(m, k, n); cout<< "Finished MMM using 1-D array of floats" << endl; //Test 1-D array
+    end_time = chrono::steady_clock::now();
+    time_map["1d-float"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    start_time = end_time;
+    auto time_fr = test_mm_fr<fraction>(m, k, n); cout<< "Finished MMM using 1-D array of fractions" << endl; //Test Fraction
+    end_time = chrono::steady_clock::now();
+    time_map["1d-fraction"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    start_time = end_time;
+    auto time_mfr = test_mm_mfr<mixed>(m, k, n); cout<< "Finished MMM using 1-D array of mixed fractions" << endl; //Test Fraction
+    end_time = chrono::steady_clock::now();
+    time_map["1d-mixed"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    start_time = end_time;
+
+    unordered_map<string, int> ndaccesses;
+    ndaccesses["fill_mat"] = m*k +k*n;
+    ndaccesses["print_pre-mat"] = m*k +k*n;
+    ndaccesses["comp_mat"] = m*k +k*n +2*n*m;  // read data from A(m,k), B(k,n), and C(m,n) and write it to C(m,n)
+    ndaccesses["print_post-mat"] = n*m;
+
+    size_t niterations = m*k*n;  // traditional matrix multiplication algo O(N^3)
+    unordered_map<string, int> ops;
+    ops["1d-int"] = 2*niterations;
+    ops["1d-float"] = 2*niterations;
+    ops["1d-fraction"] = 12*niterations;  //( 7 ops for addition and 5 ops for multiplication)
+    ops["1d-mixed"] = 43*niterations;  //(23 ops for addition and 20 ops for multiplication)
+
+    cout<< endl << "Total Time " << endl;
+    efficiency_analysis(time_map);
+    cout<< endl << "1D-int Time " << endl;
+    efficiency_analysis(time_int, ndaccesses, sizeof(int), ops["1d-int"]);
+    cout<< endl << "1D-float Time " << endl;
+    efficiency_analysis(time_fl, ndaccesses, sizeof(float), ops["1d-float"]);
+    cout<< endl << "1D-fraction Time " << endl;
+    efficiency_analysis(time_fr, ndaccesses, sizeof(fraction), ops["1d-fraction"]);
+    cout<< endl << "1D-mixed Time " << endl;
+    efficiency_analysis(time_mfr, ndaccesses, sizeof(mixed), ops["1d-mixed"]);
+
+}
+
 int main(int argc, char* argv[]){
     
     int m, k, n;
@@ -439,24 +486,42 @@ int main(int argc, char* argv[]){
     print_mat((vector<vector<float> >)C);
     */
 //*
+      string test_case;
+    int ops_it;
     unordered_map<string, double> time_map;
     auto start_time = chrono::steady_clock::now();
-    auto time_int = test_mm<int>(m, k, n); cout<< "Finished MMM using 1-D array of integers" << endl; //Test 1-D array
+    size_t sizet;
+    unordered_map<string, double> time_exe;
+// default
+#if defined(INT_1D)
+    test_case = "1-D array of integers";
+    ops_it = 2;
+    sizet = sizeof(int);
+    time_exe = test_mm<int>(m, k, n);
+#elif defined(FLOAT_1D)
+    test_case = "1-D array of floats";
+    ops_it = 2;
+    sizet = sizeof(float);
+    time_exe = test_mm<float>(m, k, n);
+#elif defined(FRACTION_1D)
+    test_case = "1-D array of fractions";
+    ops_it = 12;
+    sizet = sizeof(fraction);
+    time_exe = test_mm_fr<fraction>(m, k, n);
+#elif defined(MIXED_1D)
+    test_case = "1-D array of mixed";
+    ops_it = 43;
+    sizet = sizeof(int);
+    time_exe = test_mm_mfr<mixed>(m, k, n);
+#elif defined(DOUBLE_1D) 
+    test_case = "1-D array of double";
+    ops_it = 2;
+    sizet = sizeof(int);
+    time_exe = test_mm_fr<double>(m, k, n);
+#endif  
     auto end_time = chrono::steady_clock::now();
-    time_map["1d-int"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
-    start_time = end_time;
-    auto time_fl = test_mm<float>(m, k, n); cout<< "Finished MMM using 1-D array of floats" << endl; //Test 1-D array
-    end_time = chrono::steady_clock::now();
-    time_map["1d-float"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
-    start_time = end_time;
-    auto time_fr = test_mm_fr<fraction>(m, k, n); cout<< "Finished MMM using 1-D array of fractions" << endl; //Test Fraction
-    end_time = chrono::steady_clock::now();
-    time_map["1d-fraction"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
-    start_time = end_time;
-    auto time_mfr = test_mm_mfr<mixed>(m, k, n); cout<< "Finished MMM using 1-D array of mixed fractions" << endl; //Test Fraction
-    end_time = chrono::steady_clock::now();
-    time_map["1d-mixed"] = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
-    start_time = end_time;
+    auto time_total = chrono::duration_cast<chrono::microseconds>(end_time -start_time).count();
+    cout<< "Finished MMM using " << test_case << endl; //Test 1-D array
 
     unordered_map<string, int> ndaccesses;
     ndaccesses["fill_mat"] = m*k +k*n;
@@ -465,26 +530,13 @@ int main(int argc, char* argv[]){
     ndaccesses["comp_mat"] = m*k +k*n +2*n*m;  // read data from A(m,k), B(k,n), and C(m,n) and write it to C(m,n)
     ndaccesses["print_post-mat"] = n*m;
     ndaccesses["d2h"] = n*m;
-
+        
     size_t niterations = m*k*n;  // traditional matrix multiplication algo O(N^3)
-    unordered_map<string, int> ops;
-    ops["1d-int"] = 2*niterations;
-    ops["1d-float"] = 2*niterations;
-    ops["1d-fraction"] = 12*niterations;  //( 7 ops for addition and 5 ops for multiplication)
-    ops["1d-mixed"] = 43*niterations;  //(23 ops for addition and 20 ops for multiplication)
+    int ops = ops_it*niterations;
 
-    cout<< endl << "Total Time " << endl;
-    efficiency_analysis(time_map);
-    cout<< endl << "1D-int Time " << endl;
-    efficiency_analysis(time_int, ndaccesses, sizeof(int), ops["1d-int"]); 
-    cout<< endl << "1D-float Time " << endl;
-    efficiency_analysis(time_fl, ndaccesses, sizeof(float), ops["1d-float"]);
-    cout<< endl << "1D-fraction Time " << endl;
-    efficiency_analysis(time_fr, ndaccesses, sizeof(fraction), ops["1d-fraction"]);
-    cout<< endl << "1D-mixed Time " << endl;
-    efficiency_analysis(time_mfr, ndaccesses, sizeof(mixed), ops["1d-mixed"]);
-   
-    //-------------- CUDA ----------------//
+    cout<< endl << " Time " << endl;
+    efficiency_analysis(time_exe, ndaccesses, sizet, ops); 
+    //-------------- HIP  ----------------//
     //------------------------------------//
     return 0;
 }

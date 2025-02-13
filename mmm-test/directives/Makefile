@@ -11,8 +11,28 @@ OBJ = $(SRC:.cpp=.o)
 #COMPILER=icp
 #SYS=pvc
 
+ifeq ($(TYPE), int)
+        TYPE_FLAG = -DINT_1D
+else
+ifeq ($(TYPE), float)
+        TYPE_FLAG = -DFLOAT_1D
+else
+ifeq ($(TYPE), double)
+        TYPE_FLAG = -DDOUBLE_1D
+else
+ifeq ($(TYPE), fraction)
+        TYPE_FLAG = -DFRACTION_1D
+else
+ifeq ($(TYPE), mixed)
+        TYPE_FLAG = -DMIXED_1D
+endif
+endif
+endif
+endif
+endif
+
 ifeq ($(API), OMP_OL)
-	CXXFLAGS += -DOMP_OL
+	CXXFLAGS += -DOMP_OL $(TYPE_FLAG)
 ifeq ($(COMPILER), icp)
 	CXX = mpicxx
 	CXXFLAGS +=-fiopenmp -fopenmp-targets=spir64_gen -Xopenmp-target-backend=spir64_gen "-device 12.60.7"
@@ -29,7 +49,7 @@ else ifeq ($(API), OMP)
         CXXFLAGS +=-fiopenmp -DOMP
 endif
 
-EX=mmm_$(API)_$(COMPILER)_$(SYS)
+EX=mmm_$(API)_$(COMPILER)_$(SYS)_$(TYPE)
 
 $(EX): $(OBJ)
 	$(CXX) -o $@ $(CXXFLAGS) $(OBJ) $(LIB)
